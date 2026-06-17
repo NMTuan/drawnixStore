@@ -1,12 +1,6 @@
 import { BoardTransforms, getSelectedElements, PlaitBoard, PlaitPointerType } from '@plait/core';
 import { isHotkey } from 'is-hotkey';
-import {
-  addImage,
-  canCopySelectionAs,
-  copySelectionAsPng,
-  copySelectionAsSvg,
-  saveAsImage,
-} from '../utils/image';
+import { addImage, canCopySelectionAs, copySelectionAsSvg, saveAsSvg } from '../utils/image';
 import { saveAsJSON, saveJSON } from '../data/json';
 import {
   DrawnixBoard,
@@ -46,7 +40,7 @@ export const buildDrawnixHotkeyPlugin = (
         !PlaitBoard.hasBeenTextEditing(board)
       ) {
         if (isHotkey(['mod+shift+e'], { byKey: true })(event)) {
-          saveAsImage(board, true);
+          saveAsSvg(board);
           event.preventDefault();
           return;
         }
@@ -151,13 +145,8 @@ export const buildDrawnixHotkeyPlugin = (
         }
         if (isHotkey('shift+alt+c')(event)) {
           const canCopySvg = canCopySelectionAs('svg');
-          const canCopyPng = canCopySelectionAs('png');
-          if (canCopySvg || canCopyPng) {
-            if (canCopySvg) {
-              copySelectionAsSvg(board).catch(() => undefined);
-            } else if (canCopyPng) {
-              copySelectionAsPng(board).catch(() => undefined);
-            }
+          if (canCopySvg) {
+            copySelectionAsSvg(board).catch(() => undefined);
             event.preventDefault();
           }
 

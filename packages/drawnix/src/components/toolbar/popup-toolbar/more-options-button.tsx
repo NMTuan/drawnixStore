@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ToolButton } from '../../tool-button';
 import classNames from 'classnames';
 import { useI18n } from '../../../i18n';
@@ -7,9 +7,10 @@ import { MoreOptionsIcon } from '../../icons';
 import { Popover, PopoverContent, PopoverTrigger } from '../../popover/popover';
 import Menu from '../../menu/menu';
 import MenuItem from '../../menu/menu-item';
-import { useState } from 'react';
+import MenuItemContentSwitch from '../../menu/menu-item-content-switch';
 import { getShortcutKey } from '../../../utils/common';
 import { canCopySelectionAs, copySelectionAsPng, copySelectionAsSvg } from '../../../utils/image';
+import { useDrawnix } from '../../../hooks/use-drawnix';
 
 export type MoreOptionsButtonProps = {
   board: PlaitBoard;
@@ -17,6 +18,7 @@ export type MoreOptionsButtonProps = {
 
 export const MoreOptionsButton: React.FC<MoreOptionsButtonProps> = ({ board }) => {
   const { t } = useI18n();
+  const { appState, setAppState } = useDrawnix();
   const container = PlaitBoard.getBoardContainer(board);
   const [menuOpen, setMenuOpen] = useState(false);
   const canCopySvg = canCopySelectionAs('svg');
@@ -73,7 +75,6 @@ export const MoreOptionsButton: React.FC<MoreOptionsButtonProps> = ({ board }) =
           </MenuItem>
           <MenuItem
             onSelect={() => undefined}
-            shortcut={getShortcutKey('Shift+Alt+C')}
             aria-label={t('general.copyToClipboard')}
             disabled={!canCopyAny}
             submenu={
@@ -87,6 +88,7 @@ export const MoreOptionsButton: React.FC<MoreOptionsButtonProps> = ({ board }) =
                     copySelectionAsSvg(board).catch(() => undefined);
                   }}
                   disabled={!canCopySvg}
+                  shortcut={getShortcutKey('Shift+Alt+C')}
                   aria-label={t('general.copyToClipboard.svg')}
                 >
                   {t('general.copyToClipboard.svg')}
@@ -96,18 +98,26 @@ export const MoreOptionsButton: React.FC<MoreOptionsButtonProps> = ({ board }) =
                     copySelectionAsPng(board).catch(() => undefined);
                   }}
                   disabled={!canCopyPng}
-                  aria-label={t('general.copyToClipboard.pngWithoutBackground')}
+                  aria-label={t('general.copyToClipboard.png')}
                 >
-                  {t('general.copyToClipboard.pngWithoutBackground')}
+                  {t('general.copyToClipboard.png')}
                 </MenuItem>
                 <MenuItem
-                  onSelect={() => {
-                    copySelectionAsPng(board, true).catch(() => undefined);
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setAppState((currentAppState) => ({
+                      ...currentAppState,
+                      copyTransparent: !currentAppState.copyTransparent,
+                    }));
                   }}
-                  disabled={!canCopyPng}
-                  aria-label={t('general.copyToClipboard.pngWithBackground')}
+                  className="menu-item--setting"
+                  role="menuitemcheckbox"
+                  aria-checked={appState.copyTransparent}
+                  aria-label={t('general.copyToClipboard.transparent')}
                 >
-                  {t('general.copyToClipboard.pngWithBackground')}
+                  <MenuItemContentSwitch checked={appState.copyTransparent}>
+                    {t('general.copyToClipboard.transparent')}
+                  </MenuItemContentSwitch>
                 </MenuItem>
               </Menu>
             }
