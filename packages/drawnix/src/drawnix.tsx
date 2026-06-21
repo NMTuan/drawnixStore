@@ -32,9 +32,9 @@ import { buildPencilPlugin } from './plugins/with-pencil';
 import {
   DrawnixBoard,
   DrawnixContext,
-  DrawnixState,
   DrawnixToolState,
   mergeToolState,
+  type DrawnixState,
 } from './hooks/use-drawnix';
 import { ClosePencilToolbar } from './components/toolbar/pencil-mode-toolbar';
 import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
@@ -44,6 +44,7 @@ import { LinkPopup } from './components/popup/link-popup/link-popup';
 import { I18nProvider } from './i18n';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
+import { Toast, useToast } from './components/toast/toast';
 
 export type DrawnixProps = {
   value: PlaitElement[];
@@ -108,9 +109,14 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   });
 
   const [board, setBoard] = useState<DrawnixBoard | null>(null);
+  const [themeColorMode, setThemeColorMode] = useState<ThemeColorMode>(
+    theme?.themeColorMode || ThemeColorMode.default
+  );
+  const { toast, showToast } = useToast();
 
   if (board) {
     board.appState = appState;
+    board.showToast = showToast;
   }
 
   const hasMountedToolStateRef = useRef(false);
@@ -124,6 +130,12 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     }
     onToolStateChangeRef.current?.(appState.toolState);
   }, [appState.toolState]);
+
+  useEffect(() => {
+    if (theme?.themeColorMode) {
+      setThemeColorMode(theme.themeColorMode);
+    }
+  }, [theme?.themeColorMode]);
 
   const updateAppState = (newAppState: Partial<DrawnixState>) => {
     setAppState((currentAppState) => ({
@@ -164,10 +176,11 @@ export const Drawnix: React.FC<DrawnixProps> = ({
 
   return (
     <I18nProvider>
-      <DrawnixContext.Provider value={{ appState, setAppState }}>
+      <DrawnixContext.Provider value={{ appState, setAppState, showToast }}>
         <div
           className={classNames('drawnix', {
             'drawnix--mobile': appState.isMobile,
+            [`theme--${themeColorMode}`]: themeColorMode,
           })}
           ref={containerRef}
         >
@@ -182,7 +195,10 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             }}
             onSelectionChange={onSelectionChange}
             onViewportChange={onViewportChange}
-            onThemeChange={onThemeChange}
+            onThemeChange={(value) => {
+              setThemeColorMode(value);
+              onThemeChange?.(value);
+            }}
             onValueChange={onValueChange}
           >
             <Board
@@ -204,6 +220,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             <ClosePencilToolbar></ClosePencilToolbar>
             <TTDDialog container={containerRef.current}></TTDDialog>
             <CleanConfirm container={containerRef.current}></CleanConfirm>
+            <Toast toast={toast} container={containerRef.current}></Toast>
           </Wrapper>
           <canvas className={`${LASER_POINTER_CLASS_NAME} mouse-course-hidden`}></canvas>
         </div>

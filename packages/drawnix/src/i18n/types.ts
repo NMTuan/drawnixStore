@@ -75,6 +75,9 @@ export interface Translations {
   'general.copyToClipboard.svg': string;
   'general.copyToClipboard.png': string;
   'general.copyToClipboard.transparent': string;
+  'toast.copyToClipboard.svg': string;
+  'toast.copyToClipboard.png': string;
+  'toast.copyToClipboard.mode.transparent': string;
 
   // Language
   'language.switcher': string;

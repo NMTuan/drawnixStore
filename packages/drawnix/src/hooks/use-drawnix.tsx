@@ -11,6 +11,7 @@ import { Editor } from 'slate';
 import { LinkElement } from '@plait/common';
 import { DEFAULT_FREEHAND_PRESETS, FreehandDrawOptions } from '../plugins/freehand/presets';
 import { DrawnixFileHandle } from '../data/json';
+import type { DrawnixToastOptions } from '../components/toast/toast';
 
 export enum DialogType {
   mermaidToDrawnix = 'mermaidToDrawnix',
@@ -58,6 +59,7 @@ export const mergeToolState = (toolState?: Partial<DrawnixToolState>): DrawnixTo
 
 export interface DrawnixBoard extends PlaitBoard {
   appState: DrawnixState;
+  showToast?: (toast: DrawnixToastOptions) => void;
 }
 
 export type LinkState = {
@@ -84,11 +86,13 @@ export type DrawnixState = {
 export const DrawnixContext = createContext<{
   appState: DrawnixState;
   setAppState: Dispatch<SetStateAction<DrawnixState>>;
+  showToast: (toast: DrawnixToastOptions) => void;
 } | null>(null);
 
 export const useDrawnix = (): {
   appState: DrawnixState;
   setAppState: Dispatch<SetStateAction<DrawnixState>>;
+  showToast: (toast: DrawnixToastOptions) => void;
 } => {
   const context = useContext(DrawnixContext);
 
