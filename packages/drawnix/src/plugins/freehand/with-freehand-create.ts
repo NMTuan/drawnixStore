@@ -3,6 +3,7 @@ import {
   Point,
   Transforms,
   distanceBetweenPointAndPoint,
+  isMainPointer,
   toHostPoint,
   toViewBoxPoint,
 } from '@plait/core';
@@ -64,7 +65,7 @@ export const withFreehandCreate = (board: PlaitBoard) => {
   board.pointerDown = (event: PointerEvent) => {
     const freehandPointers = getFreehandPointers();
     const isFreehandPointer = PlaitBoard.isInPointer(board, freehandPointers);
-    if (isFreehandPointer && isDrawingMode(board)) {
+    if (isFreehandPointer && isDrawingMode(board) && isMainPointer(event)) {
       isDrawing = true;
       originScreenPoint = [event.x, event.y];
       const smoothingPoint = smoother.process(originScreenPoint) as Point;
