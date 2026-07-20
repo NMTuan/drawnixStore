@@ -43,3 +43,6 @@ Thumbs.db
 
 .claude/worktrees
 .claude/settings.local.json
+
+# 本地环境变量只供开发或部署注入，禁止纳入版本控制。
+.env.local

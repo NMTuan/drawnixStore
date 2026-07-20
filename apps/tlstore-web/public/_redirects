@@ -1,0 +1,2 @@
+# 静态宿主将分享 URL 回退到 Vite SPA，由浏览器渲染只读 SVG 页面。
+/* /index.html 200

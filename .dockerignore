@@ -1,3 +1,6 @@
+# 所有镜像均从干净依赖与构建产物开始，禁止将本地缓存和服务端凭据带入构建上下文。
 .nx
-.dist
-.node_modules
+dist
+node_modules
+.env.local
+**/.env.local
