@@ -7,7 +7,14 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: __dirname,
   cacheDir: '../../node_modules/.vite/apps/tlstore-web',
-  server: { host: 'localhost', port: 7300 },
+  server: {
+    host: 'localhost',
+    port: 7300,
+    proxy: {
+      // 本地分享链接保持 Web 同源，由 Vite 转发至独立 Nitro SVG 服务。
+      '/embed': { target: 'http://127.0.0.1:7400', changeOrigin: true },
+    },
+  },
   preview: { host: 'localhost', port: 4300 },
   plugins: [react(), nxViteTsPaths()],
   build: {

@@ -1,0 +1,18 @@
+# tlStore Nitro SVG API 镜像：PocketBase 管理员凭据仅在容器运行时以环境变量注入。
+FROM node:20 AS builder
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build:tlstore-api
+
+FROM node:20-alpine
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NITRO_PORT=7400
+COPY --from=builder /app/dist/apps/tlstore-api ./
+
+EXPOSE 7400
+CMD ["node", "server/index.mjs"]

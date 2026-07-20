@@ -5,6 +5,7 @@ import { vi } from 'vitest';
 
 vi.mock('../pocketbase', () => ({
   pocketBaseUrl: undefined,
+  tlstoreApiUrl: undefined,
   pb: {
     authStore: { isValid: false, onChange: vi.fn() },
     autoCancellation: vi.fn(),

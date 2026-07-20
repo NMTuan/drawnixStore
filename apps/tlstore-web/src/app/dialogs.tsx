@@ -1,5 +1,5 @@
 /** tlStore 的轻量模态框，承载工作区与 Canvas 的命名和归档确认操作。 */
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Copy, Link2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface DialogShellProps {
@@ -164,6 +164,102 @@ export function ConfirmDialog({
           {submitting ? '处理中' : confirmLabel}
         </button>
       </div>
+    </DialogShell>
+  );
+}
+
+interface ShareDialogProps {
+  url: string;
+  embedUrl: string;
+  enabled: boolean;
+  onClose: () => void;
+  onEnabledChange: (enabled: boolean) => Promise<void>;
+}
+
+/** 管理 Canvas 的公开访问开关，并在开启后提供普通链接与安全嵌入代码。 */
+export function ShareDialog({
+  url,
+  embedUrl,
+  enabled,
+  onClose,
+  onEnabledChange,
+}: ShareDialogProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState('');
+
+  async function setEnabled(nextEnabled: boolean) {
+    setSubmitting(true);
+    try {
+      await onEnabledChange(nextEnabled);
+    } catch {
+      // 父组件会写入全局错误横幅，弹窗保持当前状态便于用户重试。
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function copy(value: string, label: string) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = value;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.append(input);
+        input.select();
+        const copied = document.execCommand('copy');
+        input.remove();
+        if (!copied) throw new Error('浏览器拒绝访问剪贴板。');
+      }
+      setCopied(`已复制${label}`);
+    } catch {
+      setCopied('复制失败，请手动选择内容。');
+    }
+  }
+
+  const embedCode = `<img src="${embedUrl}" alt="Canvas preview" />`;
+  return (
+    <DialogShell
+      description="开启后，持有链接的人可以查看最新一次成功保存的 SVG 预览。"
+      title="分享画布"
+      onClose={onClose}
+    >
+      <label className="share-toggle">
+        <span>
+          <strong>允许公开查看</strong>
+          <small>关闭后，所有已发出的链接会立即失效。</small>
+        </span>
+        <input
+          checked={enabled}
+          disabled={submitting}
+          type="checkbox"
+          onChange={(event) => void setEnabled(event.target.checked)}
+        />
+      </label>
+      {enabled && (
+        <div className="share-links">
+          <label>
+            分享链接
+            <input readOnly value={url} />
+          </label>
+          <button className="button" type="button" onClick={() => void copy(url, '链接')}>
+            <Link2 aria-hidden="true" size={16} />
+            复制链接
+          </button>
+          <label>
+            嵌入代码
+            <textarea readOnly value={embedCode} />
+          </label>
+          <button className="button" type="button" onClick={() => void copy(embedCode, '代码')}>
+            <Copy aria-hidden="true" size={16} />
+            复制嵌入代码
+          </button>
+          {copied && <p className="share-copied">{copied}</p>}
+        </div>
+      )}
     </DialogShell>
   );
 }

@@ -10,19 +10,28 @@ import {
   type CanvasSnapshot,
   type SaveQueueState,
 } from '@tlstore/domain';
-import { Archive, ArrowLeft, Pencil, Save } from 'lucide-react';
+import type { PlaitBoard } from '@plait/core';
+import { Archive, ArrowLeft, Pencil, Save, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { exportCanvasSvg } from '../drawnix-svg';
 import type { CanvasRecord } from './types';
 
 interface CanvasEditorProps {
   canvas: CanvasRecord;
   onBack: () => void;
-  onSave: (snapshot: string) => Promise<void>;
+  onSave: (save: PendingCanvasSave) => Promise<void>;
   onRename: () => void;
   onArchive: () => void;
+  onShare: () => void;
 }
 
 const SAVE_DELAY = 900;
+
+/** 单个保存项将源快照与同一次编辑生成的 SVG 预览关联起来。 */
+export interface PendingCanvasSave {
+  snapshot: string;
+  previewSvg?: string;
+}
 
 /** 返回 Canvas 专用的离线快照存储键，避免不同画布相互覆盖。 */
 function pendingSnapshotKey(canvasId: string): string {
@@ -30,29 +39,52 @@ function pendingSnapshotKey(canvasId: string): string {
 }
 
 /** 读取待保存数据；错误或旧格式均由领域层降级为合法空白快照。 */
-function readPendingSnapshot(canvas: CanvasRecord): CanvasSnapshot {
-  return parseCanvasSnapshot(
-    localStorage.getItem(pendingSnapshotKey(canvas.id)) || canvas.snapshot
-  );
+function readPendingSave(canvas: CanvasRecord): PendingCanvasSave | null {
+  const raw = localStorage.getItem(pendingSnapshotKey(canvas.id));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PendingCanvasSave;
+    if (typeof parsed.snapshot === 'string') return parsed;
+  } catch {
+    // 兼容早期仅保存字符串快照的本地待保存数据。
+  }
+  return { snapshot: raw };
+}
+
+/** 将离线项写入本地存储，服务端成功保存同一项后才移除。 */
+function writePendingSave(canvasId: string, save: PendingCanvasSave) {
+  localStorage.setItem(pendingSnapshotKey(canvasId), JSON.stringify(save));
 }
 
 /** 显示单个 Drawnix 编辑器，负责自动保存、离线保留与网络恢复重试。 */
-export function CanvasEditor({ canvas, onBack, onSave, onRename, onArchive }: CanvasEditorProps) {
-  const [snapshot, setSnapshot] = useState<CanvasSnapshot>(() => readPendingSnapshot(canvas));
+export function CanvasEditor({
+  canvas,
+  onBack,
+  onSave,
+  onRename,
+  onArchive,
+  onShare,
+}: CanvasEditorProps) {
+  const pendingSave = readPendingSave(canvas);
+  const [snapshot, setSnapshot] = useState<CanvasSnapshot>(() =>
+    parseCanvasSnapshot(pendingSave?.snapshot || canvas.snapshot)
+  );
   const [saveState, setSaveState] = useState<SaveQueueState>('idle');
   const snapshotRef = useRef(snapshot);
-  const initialPendingRef = useRef(localStorage.getItem(pendingSnapshotKey(canvas.id)));
+  const initialPendingRef = useRef(pendingSave);
   const saveTimerRef = useRef<number | null>(null);
+  const boardRef = useRef<PlaitBoard | null>(null);
+  const documentVersionRef = useRef(0);
   const saveRef = useRef(onSave);
   saveRef.current = onSave;
-  const queueRef = useRef<SaveQueue<string> | null>(null);
+  const queueRef = useRef<SaveQueue<PendingCanvasSave> | null>(null);
 
   if (!queueRef.current) {
-    queueRef.current = new SaveQueue<string>({
+    queueRef.current = new SaveQueue<PendingCanvasSave>({
       isOnline: () => navigator.onLine,
       save: async (next) => {
         await saveRef.current(next);
-        if (localStorage.getItem(pendingSnapshotKey(canvas.id)) === next) {
+        if (localStorage.getItem(pendingSnapshotKey(canvas.id)) === JSON.stringify(next)) {
           localStorage.removeItem(pendingSnapshotKey(canvas.id));
         }
       },
@@ -76,30 +108,28 @@ export function CanvasEditor({ canvas, onBack, onSave, onRename, onArchive }: Ca
     };
   }, []);
 
-  useEffect(() => {
-    if (initialPendingRef.current) queueRef.current?.enqueue(initialPendingRef.current);
-  }, []);
-
   /** 暂存最新快照，并在防抖窗口结束后通过串行队列提交。 */
   function scheduleSave(next: CanvasSnapshot) {
+    documentVersionRef.current += 1;
     snapshotRef.current = next;
     setSnapshot(next);
     const serialized = serializeCanvasSnapshot(next);
-    localStorage.setItem(pendingSnapshotKey(canvas.id), serialized);
+    writePendingSave(canvas.id, { snapshot: serialized });
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(
-      () => queueRef.current?.enqueue(serialized),
-      SAVE_DELAY
-    );
+    saveTimerRef.current = window.setTimeout(() => void flushCurrentSnapshot(), SAVE_DELAY);
   }
 
   /** 用户主动保存时跳过防抖，并等待同一串行队列完成当前快照。 */
   async function flushCurrentSnapshot() {
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
-    const serialized = serializeCanvasSnapshot(snapshotRef.current);
-    localStorage.setItem(pendingSnapshotKey(canvas.id), serialized);
-    await queueRef.current?.enqueue(serialized);
+    const documentVersion = documentVersionRef.current;
+    const save: PendingCanvasSave = { snapshot: serializeCanvasSnapshot(snapshotRef.current) };
+    if (boardRef.current) save.previewSvg = await exportCanvasSvg(boardRef.current);
+    // 导出期间若有新编辑，丢弃旧 SVG；新编辑的防抖任务会提交匹配的快照与预览。
+    if (documentVersion !== documentVersionRef.current) return flushCurrentSnapshot();
+    writePendingSave(canvas.id, save);
+    await queueRef.current?.enqueue(save);
     if (queueRef.current?.hasPending()) throw new Error('当前画布尚未保存，无法继续操作。');
   }
 
@@ -112,6 +142,13 @@ export function CanvasEditor({ canvas, onBack, onSave, onRename, onArchive }: Ca
   function requestArchive() {
     void flushCurrentSnapshot()
       .then(onArchive)
+      .catch(() => undefined);
+  }
+
+  /** 分享同样使用最后成功保存的 SVG，确保新打开的链接不会展示旧预览。 */
+  function requestShare() {
+    void flushCurrentSnapshot()
+      .then(onShare)
       .catch(() => undefined);
   }
 
@@ -136,6 +173,9 @@ export function CanvasEditor({ canvas, onBack, onSave, onRename, onArchive }: Ca
         <button className="icon-button" type="button" title="归档画布" onClick={requestArchive}>
           <Archive aria-hidden="true" size={17} />
         </button>
+        <button className="icon-button" type="button" title="分享画布" onClick={requestShare}>
+          <Share2 aria-hidden="true" size={17} />
+        </button>
         <button
           className="button button--primary editor-save"
           type="button"
@@ -159,6 +199,11 @@ export function CanvasEditor({ canvas, onBack, onSave, onRename, onArchive }: Ca
           }}
           onToolStateChange={(toolState) => {
             snapshotRef.current = { ...snapshotRef.current, toolState };
+          }}
+          afterInit={(board) => {
+            boardRef.current = board;
+            if (initialPendingRef.current)
+              void flushCurrentSnapshot().catch(() => setSaveState('error'));
           }}
         />
       </section>

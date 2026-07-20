@@ -93,6 +93,11 @@ async function bootstrap() {
       },
       { name: 'title', type: 'text', required: true, min: 1, max: 200 },
       { name: 'snapshot', type: 'text', required: false, max: 10_000_000, default: '' },
+      // SVG 只作为列表和嵌入读模型；源快照始终是 Canvas 的唯一编辑真相。
+      { name: 'preview_svg', type: 'text', required: false, max: 10_000_000, default: '' },
+      // 分享 token 是 bearer credential，由浏览器安全随机源生成，API 只在开关开启时接受它。
+      { name: 'share_token', type: 'text', required: false, max: 128, default: '' },
+      { name: 'share_enabled', type: 'bool', required: false, default: false },
       // 归档只控制列表可见性，始终保留 Canvas 快照以供恢复。
       { name: 'archived', type: 'bool', required: false, default: false },
       { name: 'revision', type: 'number', required: false, min: 0, default: 0 },

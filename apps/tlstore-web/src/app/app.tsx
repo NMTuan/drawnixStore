@@ -15,9 +15,10 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { pb, pocketBaseUrl } from '../pocketbase';
-import { CanvasEditor } from './canvas-editor';
-import { ConfirmDialog, TextDialog } from './dialogs';
+import { pb, pocketBaseUrl, tlstoreApiUrl } from '../pocketbase';
+import { CanvasEditor, type PendingCanvasSave } from './canvas-editor';
+import { CanvasSvg } from './canvas-svg';
+import { ConfirmDialog, ShareDialog, TextDialog } from './dialogs';
 import type { CanvasRecord, WorkspaceRecord } from './types';
 
 type CanvasView = 'active' | 'archived';
@@ -48,6 +49,31 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
+/** 使用浏览器安全随机源生成 192 位 bearer token，避免可预测的公开链接。 */
+function createShareToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 从已配置的 API 根地址构造嵌入 SVG URL，不将 token 发送给 PocketBase 公共接口。 */
+function embedSvgUrl(token: string): string {
+  return `${tlstoreApiUrl?.replace(/\/$/, '') || window.location.origin}/embed/${token}.svg`;
+}
+
+/** 匿名分享页仅加载 SVG 图片，不能读取 Canvas JSON 或挂载编辑器。 */
+function ShareCanvasPage({ token }: { token: string }) {
+  return (
+    <main className="share-page">
+      <header>
+        <strong>tlStore</strong>
+        <span>只读分享</span>
+      </header>
+      <img alt="Canvas preview" src={embedSvgUrl(token)} />
+    </main>
+  );
+}
+
 /** 提供账户入口、工作区与 Canvas 管理，并根据 URL 打开唯一资源。 */
 export function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
@@ -59,6 +85,7 @@ export function App() {
   const [canvasView, setCanvasView] = useState<CanvasView>('active');
   const [dialog, setDialog] = useState<DialogState>(null);
   const [archiveTarget, setArchiveTarget] = useState<CanvasRecord | null>(null);
+  const [shareCanvas, setShareCanvas] = useState<CanvasRecord | null>(null);
   const [error, setError] = useState('');
   const loadRequestIdRef = useRef(0);
   const loadPathRef = useRef<(requestId: number) => Promise<void>>(async () => undefined);
@@ -185,6 +212,9 @@ export function App() {
         workspace: workspace.id,
         title: '未命名画布',
         snapshot: serializeCanvasSnapshot(createEmptyCanvasSnapshot()),
+        preview_svg: '',
+        share_token: '',
+        share_enabled: false,
         archived: false,
         revision: 0,
       });
@@ -232,13 +262,22 @@ export function App() {
   }
 
   /** 成功保存后的服务端记录覆盖本地状态，明确采用最后成功保存优先语义。 */
-  async function saveCanvas(snapshot: string) {
+  async function saveCanvas(save: PendingCanvasSave) {
     if (!canvas) throw new Error('当前画布已关闭，无法保存。');
     try {
-      const updated = await pb.collection('canvases').update<CanvasRecord>(canvas.id, {
-        snapshot,
+      const update: Partial<CanvasRecord> = {
+        snapshot: save.snapshot,
         revision: canvas.revision + 1,
-      });
+      };
+      // 图片会以内嵌 Data URL 进入 SVG；超限时关闭分享，避免旧预览继续公开。
+      if (save.previewSvg && save.previewSvg.length > 10_000_000) {
+        update.preview_svg = '';
+        update.share_enabled = false;
+        setError('SVG 预览超过 10 MB，已保存画布快照并关闭分享。');
+      } else if (save.previewSvg) {
+        update.preview_svg = save.previewSvg;
+      }
+      const updated = await pb.collection('canvases').update<CanvasRecord>(canvas.id, update);
       setCanvas(updated);
       setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (cause) {
@@ -247,6 +286,40 @@ export function App() {
     }
   }
 
+  /** 确保 Canvas 拥有稳定的分享 token；仅打开弹窗时生成，默认仍保持关闭。 */
+  async function openShare(target: CanvasRecord) {
+    try {
+      const token = target.share_token || createShareToken();
+      const updated = target.share_token
+        ? target
+        : await pb.collection('canvases').update<CanvasRecord>(target.id, { share_token: token });
+      if (!target.share_token) {
+        setCanvas((current) => (current?.id === updated.id ? updated : current));
+        setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      }
+      setShareCanvas(updated);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    }
+  }
+
+  /** 更新唯一的公开访问开关；API 每次请求都会读取它，因此关闭立即生效。 */
+  async function setShareEnabled(target: CanvasRecord, shareEnabled: boolean) {
+    try {
+      const updated = await pb.collection('canvases').update<CanvasRecord>(target.id, {
+        share_enabled: shareEnabled,
+      });
+      setCanvas((current) => (current?.id === updated.id ? updated : current));
+      setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setShareCanvas(updated);
+    } catch (cause) {
+      setError(errorMessage(cause));
+      throw cause;
+    }
+  }
+
+  const shareToken = pathname.match(/^\/share\/([a-f0-9]{48})$/)?.[1];
+  if (shareToken) return <ShareCanvasPage token={shareToken} />;
   if (!pocketBaseUrl) return <main className="notice-page">缺少 `VITE_POCKETBASE_URL` 配置。</main>;
   if (!authenticated) return <AuthScreen error={error} onError={setError} />;
 
@@ -260,6 +333,7 @@ export function App() {
           onBack={() => navigate(`/workspaces/${canvas.workspace}`)}
           onRename={() => setDialog({ kind: 'rename-canvas', canvas })}
           onSave={saveCanvas}
+          onShare={() => void openShare(canvas)}
         />
         {error && <ErrorBanner message={error} onClose={() => setError('')} />}
         {dialog?.kind === 'rename-canvas' && (
@@ -278,6 +352,15 @@ export function App() {
             canvas={archiveTarget}
             onClose={() => setArchiveTarget(null)}
             onConfirm={archiveCanvas}
+          />
+        )}
+        {shareCanvas && (
+          <ShareDialog
+            embedUrl={embedSvgUrl(shareCanvas.share_token)}
+            enabled={shareCanvas.share_enabled}
+            url={`${window.location.origin}/share/${shareCanvas.share_token}`}
+            onClose={() => setShareCanvas(null)}
+            onEnabledChange={(enabled) => setShareEnabled(shareCanvas, enabled)}
           />
         )}
       </>
@@ -448,11 +531,20 @@ export function App() {
           onConfirm={archiveCanvas}
         />
       )}
+      {shareCanvas && (
+        <ShareDialog
+          embedUrl={embedSvgUrl(shareCanvas.share_token)}
+          enabled={shareCanvas.share_enabled}
+          url={`${window.location.origin}/share/${shareCanvas.share_token}`}
+          onClose={() => setShareCanvas(null)}
+          onEnabledChange={(enabled) => setShareEnabled(shareCanvas, enabled)}
+        />
+      )}
     </main>
   );
 }
 
-/** 以卡片展示 Canvas；由于 SVG 未实现，预览区明确保持为不加载编辑器的占位面。 */
+/** 以卡片展示 Canvas；预览仅使用已保存 SVG，不在列表中初始化编辑器。 */
 function CanvasGrid({
   canvases,
   view,
@@ -486,7 +578,15 @@ function CanvasGrid({
             onClick={() => onOpen(item)}
           >
             <div className="canvas-card__preview">
-              <span>空白画布</span>
+              {item.preview_svg ? (
+                <CanvasSvg
+                  alt={`${item.title} 的预览`}
+                  className="canvas-card__svg"
+                  svg={item.preview_svg}
+                />
+              ) : (
+                <span>空白画布</span>
+              )}
               <i />
             </div>
             <div className="canvas-card__info">
@@ -495,7 +595,9 @@ function CanvasGrid({
             </div>
           </button>
           <div className="canvas-card__footer">
-            <span>{view === 'archived' ? '已归档' : '私有画布'}</span>
+            <span>
+              {view === 'archived' ? '已归档' : item.share_enabled ? '已分享' : '私有画布'}
+            </span>
             <div className="canvas-menu">
               <button
                 className="icon-button"

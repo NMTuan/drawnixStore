@@ -8,13 +8,16 @@ export interface WorkspaceRecord {
   updated: string;
 }
 
-/** Canvas 的最小持久化记录，不包含尚未实现的分享和预览字段。 */
+/** Canvas 的持久化记录，包含仅供列表和分享读取的最后成功 SVG 预览。 */
 export interface CanvasRecord {
   id: string;
   owner: string;
   workspace: string;
   title: string;
   snapshot: string;
+  preview_svg: string;
+  share_token: string;
+  share_enabled: boolean;
   archived: boolean;
   revision: number;
   created: string;

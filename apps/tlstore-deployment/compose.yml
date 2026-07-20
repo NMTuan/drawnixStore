@@ -1,0 +1,24 @@
+# tlStore 生产编排：PocketBase 由受管服务或独立容器提供，绝不向浏览器暴露管理员凭据。
+services:
+  tlstore-api:
+    build:
+      context: ../..
+      dockerfile: apps/tlstore-api/dockerfile
+    environment:
+      NITRO_POCKETBASE_INTERNAL_URL: ${NITRO_POCKETBASE_INTERNAL_URL:?请设置 PocketBase 内网地址}
+      NITRO_POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
+      NITRO_POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
+    restart: unless-stopped
+
+  tlstore-web:
+    build:
+      context: ../..
+      dockerfile: apps/tlstore-web/dockerfile
+      args:
+        VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL:?请设置浏览器可访问的 PocketBase URL}
+        VITE_TLSTORE_API_URL: ''
+    depends_on:
+      - tlstore-api
+    ports:
+      - '${TLSTORE_WEB_PORT:-7300}:80'
+    restart: unless-stopped
