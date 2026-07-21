@@ -1,12 +1,13 @@
 /// <reference types="vitest/globals" />
 /** Drawnix Store 根组件的会话状态测试，浏览器只通过同源 BFF 获取会话。 */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, vi } from 'vitest';
 
 const bffMock = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   logout: vi.fn(),
   session: vi.fn(),
+  getSharedCanvasForEditing: vi.fn(),
 }));
 
 vi.mock('../bff-client', () => ({ bff: bffMock }));
@@ -19,6 +20,7 @@ describe('App', () => {
     bffMock.listWorkspaces.mockReset().mockResolvedValue([]);
     bffMock.logout.mockReset().mockResolvedValue(undefined);
     bffMock.session.mockReset().mockRejectedValue(new Error('未登录'));
+    bffMock.getSharedCanvasForEditing.mockReset().mockRejectedValue(new Error('没有编辑权限'));
   });
 
   it('没有会话时显示登录入口', async () => {
@@ -47,5 +49,24 @@ describe('App', () => {
 
     expect(await screen.findByText('登出失败')).toBeTruthy();
     expect(screen.getByTitle('退出登录')).toBeTruthy();
+  });
+
+  it('有效分享页仅为已登录 owner 提供编辑入口', async () => {
+    window.history.replaceState({}, '', `/share/${'a'.repeat(48)}`);
+    bffMock.session.mockResolvedValue({ id: 'user-1', email: 'user@example.com' });
+    bffMock.getSharedCanvasForEditing.mockResolvedValue('canvas-1');
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: '编辑画布' })).toBeTruthy();
+  });
+
+  it('非 owner 访问分享页时不显示编辑入口', async () => {
+    const token = 'b'.repeat(48);
+    window.history.replaceState({}, '', `/share/${token}`);
+    bffMock.session.mockResolvedValue({ id: 'user-2', email: 'other@example.com' });
+    render(<App />);
+
+    await waitFor(() => expect(bffMock.getSharedCanvasForEditing).toHaveBeenCalledWith(token));
+    expect(screen.queryByRole('button', { name: '编辑画布' })).toBeNull();
   });
 });

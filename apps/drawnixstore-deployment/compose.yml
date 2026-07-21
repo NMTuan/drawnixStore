@@ -1,4 +1,4 @@
-# Drawnix Store 生产编排：Web 仅供外部 HTTPS 反向代理访问，PocketBase 与 API 始终留在私有网络。
+# Drawnix Store 生产编排：生产环境通过外部 HTTPS 反向代理访问；受控 HTTP 仅限局域网调试。PocketBase 与 API 始终留在私有网络。
 services:
   pocketbase-init:
     # 固定已验证的 PocketBase 版本，升级前必须完成 Schema 与端到端兼容性验证。
@@ -50,8 +50,6 @@ services:
       NITRO_POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
       NITRO_POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
       NITRO_WEB_ORIGIN: ${DRAWNIX_STORE_PUBLIC_ORIGIN:?请设置 Drawnix Store 公开 HTTPS 地址}
-      # HTTPS 生产环境必须为 true；仅受控的本地 HTTP 调试可显式设为 false。
-      NITRO_SESSION_SECURE: ${NITRO_SESSION_SECURE:-true}
     restart: unless-stopped
   drawnixstore-web:
     image: ${DRAWNIX_STORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-web:${DRAWNIX_STORE_IMAGE_TAG:-latest}

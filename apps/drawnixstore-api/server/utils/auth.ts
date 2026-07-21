@@ -38,7 +38,8 @@ export function createUserPocketBase(): PocketBase {
 }
 
 function hasSecureSessionCookie(): boolean {
-  return String(runtimeConfig().sessionSecure) === 'true';
+  // Cookie 属性必须与浏览器实际访问的固定公开来源一致，避免 HTTP 部署返回浏览器会拒绝的 Secure Cookie。
+  return new URL(runtimeConfig().webOrigin).protocol === 'https:';
 }
 
 function sessionCookieName(): string {

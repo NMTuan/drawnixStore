@@ -166,4 +166,8 @@ export const bff = {
       (await request<{ canvas: ApiCanvas }>(`/canvases/${id}/share`, { method: 'POST' })).canvas
     );
   },
+  /** 仅在当前用户拥有仍在公开分享的 Canvas 时返回其编辑资源 ID。 */
+  async getSharedCanvasForEditing(token: string): Promise<string> {
+    return (await request<{ canvasId: string }>(`/share/${token}`)).canvasId;
+  },
 };
