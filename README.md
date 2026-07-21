@@ -1,145 +1,74 @@
-<p align="center">
-  <picture style="width: 320px">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h.svg?raw=true" />
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h_dark.svg?raw=true" />
-    <img src="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/logo/logo_drawnix_h.svg?raw=true" width="360" alt="Drawnix logo and name" />
-  </picture>
-</p>
-<div align="center">
-  <h2>
-    开源白板工具（SaaS），一体化白板，包含思维导图、流程图、自由画等
-  <br />
-  </h2>
-</div>
+# tlStore
 
-<div align="center">
-  <figure>
-    <a target="_blank" rel="noopener">
-      <img src="https://github.com/plait-board/drawnix/blob/develop/apps/web/public/product_showcase/case-2.png" alt="Product showcase" width="80%" />
-    </a>
-    <figcaption>
-      <p align="center">
-        All in one 白板，思维导图、流程图、自由画等
-      </p>
-    </figcaption>
-  </figure>
-  <a href="https://hellogithub.com/repository/plait-board/drawnix" target="_blank">
-    <picture style="width: 250">
-      <source media="(prefers-color-scheme: light)" srcset="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=neutral" />
-      <source media="(prefers-color-scheme: dark)" srcset="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=dark" />
-      <img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=4dcea807fab7468a962c153b07ae4e4e&claim_uid=zmFSY5k8EuZri43&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54"/>
-    </picture>
-  </a>
+tlStore 是一个私有 Canvas 工作台，提供账户登录、工作区、画布保存、归档和只读 SVG 分享能力。浏览器只通过同源 BFF 访问业务数据，PocketBase 保持在内部网络中。
 
-  <br />
+## 上游来源
 
-  <a href="https://trendshift.io/repositories/13979" target="_blank"><img src="https://trendshift.io/api/badge/repositories/13979" alt="plait-board%2Fdrawnix | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-</div>
+本仓库 fork 自 [plait-board/drawnix](https://github.com/plait-board/drawnix)，保留 Drawnix 和 Plait 的画布能力作为上游依赖。
 
-[*English README*](https://github.com/plait-board/drawnix/blob/develop/README_en.md)
+tlStore 的业务代码位于独立的 `apps/tlstore-*` 和 `packages/tlstore-*` 目录。业务应用仅使用 `@drawnix/drawnix` 的公开导出、Props 和回调，不修改或依赖上游核心包的内部实现。同步上游前后应构建并验证 tlStore 的公开 API 兼容性。
 
-## 特性
+## 架构
 
-- 💯 免费 + 开源
-- ⚒️ 思维导图、流程图
-- 🖌 画笔
-- 😀 插入图片
-- 🚀 基于插件机制
-- 🖼️ 📃 导出为 PNG, JSON(`.drawnix`)
-- 💾 自动保存（浏览器缓存）
-- ⚡ 编辑特性：撤销、重做、复制、粘贴等
-- 🌌 无限画布：缩放、滚动
-- 🎨 主题模式
-- 📱 移动设备适配
-- 📈 支持 mermaid 语法转流程图
-- ✨ 支持 markdown 文本转思维导图（新支持 🔥🔥🔥）
+```text
+Browser
+  |
+  v
+tlstore-web (Nginx, :80)
+  |-- /api, /embed --> tlstore-api (Nitro, :7400)
+                              |
+                              v
+                        PocketBase (:8090, private network)
 
-
-## 关于名称
-
-***Drawnix***  ，源于绘画(  ***Draw***  )与凤凰(  ***Phoenix***  )的灵感交织。
-
-凤凰象征着生生不息的创造力，而 *Draw* 代表着人类最原始的表达方式。在这里，每一次创作都是一次艺术的涅槃，每一笔绘画都是灵感的重生。
-
-创意如同凤凰，浴火方能重生，而  ***Drawnix***  要做技术与创意之火的守护者。
-
-*Draw Beyond, Rise Above.*
-
-
-## 与 Plait 画图框架
-
-*Drawnix* 的定位是一个开箱即用、开源、免费的工具产品，它的底层是 *Plait* 框架，*Plait* 是我司开源的一款画图框架，代表着公司在知识库产品([PingCode Wiki](https://pingcode.com/product/wiki?utm_source=drawnix))上的重要技术沉淀。
-
-
-Drawnix 是插件架构，与前面说到开源工具比技术架构更复杂一些，但是插件架构也有优势，比如能够支持多种 UI 框架（*Angular、React*），能够集成不同富文本框架（当前仅支持 *Slate* 框架），在开发上可以很好的实现业务的分层，开发各种细粒度的可复用插件，可以扩展更多的画板的应用场景。
-
-
-## 仓储结构
-
-```
-drawnix/
-├── apps/
-│   ├── web                   # drawnix.com
-│   │    └── index.html       # HTML
-├── dist/                     # 构建产物
-├── packages/
-│   └── drawnix/              # 白板应用
-│   └── react-board/          # 白板 React 视图层
-│   └── react-text/           # 文本渲染模块
-├── package.json
-├── ...
-└── README.md
-└── README_en.md
-
+tlstore-bootstrap -- one-shot --> PocketBase collections
 ```
 
-## 应用
+- `tlstore-web`：React 和 Drawnix 编辑器，静态文件由 Nginx 提供，并代理同源 API。
+- `tlstore-api`：Nitro BFF，负责认证、权限校验、Canvas 数据和公开 SVG。
+- `tlstore-bootstrap`：一次性初始化 PocketBase 集合及访问规则。
+- `PocketBase`：保存用户、工作区和 Canvas；不直接暴露给浏览器。
 
-[*https://drawnix.com*](https://drawnix.com) 是 *drawnix* 的最小化应用。
+## 容器部署
 
-近期会高频迭代 drawnix.com，直到发布 *Dawn（破晓）* 版本。
+GitHub Actions 会发布 Web、API、Bootstrap 三个多架构镜像到 GHCR。部署主机不需要仓库源码、Node.js 或本地构建环境。
 
+1. 下载 [compose.yml](apps/tlstore-deployment/compose.yml) 和 [.env.example](apps/tlstore-deployment/.env.example) 到部署目录。
+2. 将 `.env.example` 改名为 `.env.local`，填写管理员凭据、32 字节 `POCKETBASE_ENCRYPTION`、公开 HTTPS 地址和镜像标签。
+3. 拉取并启动服务：
 
-## 开发
-
-```
-npm install
-
-npm run start
-```
-
-## Docker
-
-```
-docker pull pubuzhixing/drawnix:latest
+```bash
+docker compose --env-file .env.local -f compose.yml pull
+docker compose --env-file .env.local -f compose.yml up -d
 ```
 
-## 依赖
+默认镜像前缀为 `ghcr.io/nmtuan/drawnixstore`。部署 fork 或私有 GHCR 包时，通过 `DRAWNIX_STORE_IMAGE_REPOSITORY` 覆盖；私有包需先执行 `docker login ghcr.io`。
 
-- [plait](https://github.com/worktile/plait) - 开源画图框架
-- [slate](https://github.com/ianstormtaylor/slate)  - 富文本编辑器框架
-- [floating-ui](https://github.com/floating-ui/floating-ui)  - 一个超级好用的创建弹出层基础库
+生产环境必须使用同一次 GitHub Actions 发布产生的 `sha-<短提交>` 作为 `DRAWNIX_STORE_IMAGE_TAG`，使 Web、API、Bootstrap 保持同一版本。`latest` 仅用于测试。
 
+Web 默认监听 `7300`，生产环境应由外部 HTTPS 反向代理将 `TLSTORE_PUBLIC_ORIGIN` 的流量转发至该端口。HTTPS 环境须保持 `NITRO_SESSION_SECURE=true`，否则浏览器不会安全地处理会话 Cookie。
 
+部署检查、数据卷和 PocketBase 升级边界见 [apps/tlstore-deployment/readme.md](apps/tlstore-deployment/readme.md)。
 
-## 贡献
+## 本地开发
 
-欢迎任何形式的贡献：
+前置条件：Node.js 版本与 `.nvmrc` 一致，并有可访问的 PocketBase 实例。
 
-- 提 Bug
+```bash
+npm ci
+npm run start:tlstore-api
+npx nx serve tlstore-web
+```
 
-- 贡献代码
+API 默认运行于 `http://localhost:7400`，Web 默认运行于 `http://localhost:7300`。在仓库根目录创建未跟踪的 `.env.local`，并参考 `apps/tlstore-api/.env.example` 填写本地 PocketBase 配置；首次初始化集合可执行：
 
-## 感谢支持
+```bash
+npm run bootstrap:tlstore
+```
 
-特别感谢公司对开源项目的大力支持，也感谢为本项目贡献代码、提供建议的朋友。
+## 自动化发布
 
-<p align="left">
-  <a href="https://pingcode.com?utm_source=drawnix" target="_blank">
-      <img src="https://cdn-aliyun.pingcode.com/static/site/img/pingcode-logo.4267e7b.svg" width="120" alt="PingCode" />
-  </a>
-</p>
+唯一的 GitHub Actions 工作流为 [drawnix-store-images.yml](.github/workflows/drawnix-store-images.yml)。它在 `develop`、`main`、`master`、`v*` tag 或手动触发时，构建并发布 tlStore 的三个运行镜像。
 
-## License
+## 许可证
 
-[MIT License](https://github.com/plait-board/drawnix/blob/master/LICENSE)  
+本仓库沿用 [MIT License](LICENSE)。Drawnix 和 Plait 的相关版权及许可证以各自上游仓库为准。
