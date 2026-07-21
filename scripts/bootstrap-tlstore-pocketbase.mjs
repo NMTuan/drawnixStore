@@ -1,24 +1,22 @@
 /**
  * 初始化 tlStore 的 PocketBase 私有数据集合。
- * 此脚本仅在部署环境运行，超级管理员凭据不可出现在浏览器环境变量中。
+ * 此原生 ESM 脚本只依赖生产依赖，可在一次性部署容器中运行而无需 TypeScript 工具链。
  */
 import { config } from 'dotenv';
 import PocketBase, { ClientResponseError } from 'pocketbase';
 
 config({ path: '.env.local', quiet: true });
 
-const baseUrl = process.env.POCKETBASE_INTERNAL_URL || process.env.VITE_POCKETBASE_URL;
+const baseUrl = process.env.POCKETBASE_INTERNAL_URL || process.env.NITRO_POCKETBASE_INTERNAL_URL;
 const email = process.env.POCKETBASE_SUPERUSER_EMAIL;
 const password = process.env.POCKETBASE_SUPERUSER_PASSWORD;
 
-if (!baseUrl || !email || !password) {
-  throw new Error('缺少 PocketBase 初始化所需环境变量。');
-}
+if (!baseUrl || !email || !password) throw new Error('缺少 PocketBase 初始化所需环境变量。');
 
 const pb = new PocketBase(baseUrl);
 
 /** 创建或更新指定集合定义，不删除集合中已有的业务记录。 */
-async function ensureCollection(definition: Record<string, unknown>) {
+async function ensureCollection(definition) {
   try {
     const existing = await pb.collections.getOne(String(definition.name));
     await pb.collections.update(existing.id, definition);
@@ -33,7 +31,7 @@ async function ensureCollection(definition: Record<string, unknown>) {
 
 /** 创建 Workspace 与 Canvas，并将每项读写严格限制到记录 owner。 */
 async function bootstrap() {
-  await pb.collection('_superusers').authWithPassword(email!, password!);
+  await pb.collection('_superusers').authWithPassword(email, password);
   const users = await pb.collections.getOne('users');
   const privateRules = {
     listRule: 'owner = @request.auth.id',
@@ -95,7 +93,7 @@ async function bootstrap() {
       { name: 'snapshot', type: 'text', required: false, max: 10_000_000, default: '' },
       // SVG 只作为列表和嵌入读模型；源快照始终是 Canvas 的唯一编辑真相。
       { name: 'preview_svg', type: 'text', required: false, max: 10_000_000, default: '' },
-      // 分享 token 是 bearer credential，由浏览器安全随机源生成，API 只在开关开启时接受它。
+      // 分享 token 是 bearer credential，由 BFF 服务端安全随机源生成，API 只在开关开启时接受它。
       { name: 'share_token', type: 'text', required: false, max: 128, default: '' },
       { name: 'share_enabled', type: 'bool', required: false, default: false },
       // 归档只控制列表可见性，始终保留 Canvas 快照以供恢复。
@@ -107,4 +105,4 @@ async function bootstrap() {
   });
 }
 
-void bootstrap();
+await bootstrap();
