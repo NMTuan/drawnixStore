@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { bff } from '../bff-client';
+import { bff, type AuthEntryStatus } from '../bff-client';
 import { CanvasEditor, type PendingCanvasSave } from './canvas-editor';
 import { CanvasSvg } from './canvas-svg';
 import { ConfirmDialog, ShareDialog, TextDialog } from './dialogs';
@@ -102,6 +102,10 @@ function ShareCanvasPage({ token, authenticated }: { token: string; authenticate
 export function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
   const [authenticated, setAuthenticated] = useState(false);
+  const [authEntryStatus, setAuthEntryStatus] = useState<AuthEntryStatus>({
+    registrationEnabled: false,
+    initialSetupAvailable: false,
+  });
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(null);
   const [canvases, setCanvases] = useState<CanvasRecord[]>([]);
@@ -128,9 +132,18 @@ export function App() {
         if (!active) return;
         setAuthenticated(true);
       })
-      .catch(() => {
+      .catch(async () => {
         if (!active) return;
         setAuthenticated(false);
+        try {
+          const status = await bff.authEntryStatus();
+          if (!active) return;
+          setAuthEntryStatus(status);
+          if (status.initialSetupAvailable && !window.location.pathname.startsWith('/share/'))
+            navigate('/setup');
+        } catch {
+          // 认证状态查询失败时保守地隐藏注册入口，仍保留已有用户登录能力。
+        }
       });
     return () => {
       active = false;
@@ -339,10 +352,24 @@ export function App() {
 
   const shareToken = pathname.match(/^\/share\/([a-f0-9]{48})$/)?.[1];
   if (shareToken) return <ShareCanvasPage authenticated={authenticated} token={shareToken} />;
+  if (!authenticated && pathname === '/setup' && authEntryStatus.initialSetupAvailable)
+    return (
+      <SetupScreen
+        error={error}
+        onAuthenticated={() => {
+          setError('');
+          setAuthenticated(true);
+          navigate('/');
+        }}
+        onClearError={() => setError('')}
+        onError={setError}
+      />
+    );
   if (!authenticated)
     return (
       <AuthScreen
         error={error}
+        registrationEnabled={authEntryStatus.registrationEnabled}
         onAuthenticated={() => {
           setError('');
           setAuthenticated(true);
@@ -744,14 +771,16 @@ function ArchiveDialog({
   );
 }
 
-/** 提供参考项目同等的邮箱密码登录与注册入口。 */
+/** 提供私有部署的登录入口，仅在服务端明确允许时展示普通注册操作。 */
 function AuthScreen({
   error,
+  registrationEnabled,
   onAuthenticated,
   onClearError,
   onError,
 }: {
   error: string;
+  registrationEnabled: boolean;
   onAuthenticated: () => void;
   onClearError: () => void;
   onError: (message: string) => void;
@@ -789,22 +818,24 @@ function AuthScreen({
         <form className="auth-form" onSubmit={(event) => void submit(event)}>
           <div className="section-label">进入工作台</div>
           <h1>{mode === 'login' ? '欢迎回来' : '创建账户'}</h1>
-          <div className="canvas-tabs">
-            <button
-              className={mode === 'login' ? 'is-active' : ''}
-              type="button"
-              onClick={() => setMode('login')}
-            >
-              登录
-            </button>
-            <button
-              className={mode === 'register' ? 'is-active' : ''}
-              type="button"
-              onClick={() => setMode('register')}
-            >
-              注册
-            </button>
-          </div>
+          {registrationEnabled && (
+            <div className="canvas-tabs">
+              <button
+                className={mode === 'login' ? 'is-active' : ''}
+                type="button"
+                onClick={() => setMode('login')}
+              >
+                登录
+              </button>
+              <button
+                className={mode === 'register' ? 'is-active' : ''}
+                type="button"
+                onClick={() => setMode('register')}
+              >
+                注册
+              </button>
+            </div>
+          )}
           <label htmlFor="email">邮箱</label>
           <input
             id="email"
@@ -829,6 +860,93 @@ function AuthScreen({
           )}
           <button className="button button--primary" disabled={submitting} type="submit">
             {submitting ? '处理中' : mode === 'login' ? '登录' : '创建账户'}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+/** 在未创建任何用户的私有部署中收集首账号与一次性服务端初始化令牌。 */
+function SetupScreen({
+  error,
+  onAuthenticated,
+  onClearError,
+  onError,
+}: {
+  error: string;
+  onAuthenticated: () => void;
+  onClearError: () => void;
+  onError: (message: string) => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [token, setToken] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onClearError();
+    setSubmitting(true);
+    try {
+      await bff.setup(email, password, token);
+      setToken('');
+      onAuthenticated();
+    } catch (cause) {
+      onError(errorMessage(cause));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  return (
+    <main className="auth-page">
+      <section className="auth-intro">
+        <div className="brand">Drawnix Store</div>
+        <div>
+          <div className="section-label">首次初始化</div>
+          <h1>创建唯一的工作台账户。</h1>
+          <p>此入口仅在尚未创建用户时可用，完成后将自动关闭。</p>
+        </div>
+        <small>Drawnix Store / private canvas archive</small>
+      </section>
+      <section className="auth-panel">
+        <form className="auth-form" onSubmit={(event) => void submit(event)}>
+          <div className="section-label">初始化工作台</div>
+          <h1>创建首个账户</h1>
+          <label htmlFor="setup-email">邮箱</label>
+          <input
+            autoComplete="email"
+            id="setup-email"
+            required
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <label htmlFor="setup-password">密码</label>
+          <input
+            autoComplete="new-password"
+            id="setup-password"
+            minLength={8}
+            required
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <label htmlFor="setup-token">初始化令牌</label>
+          <input
+            autoComplete="off"
+            id="setup-token"
+            required
+            type="password"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+          />
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="button button--primary" disabled={submitting} type="submit">
+            {submitting ? '处理中' : '完成初始化'}
           </button>
         </form>
       </section>

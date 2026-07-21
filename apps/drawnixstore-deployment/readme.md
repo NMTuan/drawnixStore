@@ -28,6 +28,16 @@ docker compose -f compose.yml up -d --force-recreate drawnixstore-api
 
 若使用 `.env.local`，在上述命令的 `docker compose` 后加入 `--env-file .env.local`。
 
+## 私有账户初始化
+
+`DRAWNIX_STORE_REGISTRATION_ENABLED` 默认是 `false`，普通 `/api/auth/register` 会返回 `403`，登录页面也不会显示注册入口。首次部署须设置 `DRAWNIX_STORE_SETUP_TOKEN`，建议使用 `openssl rand -hex 32` 生成至少 32 字节的安全随机值。
+
+当系统尚无用户、普通注册关闭且令牌已配置时，访问站点会进入 `/setup`。在该页面输入邮箱、密码与初始化令牌即可创建唯一首账号并自动登录。首账号创建后，初始化端点立即失效；令牌不会由 API 返回或被浏览器持久化、不写入日志，也不会注入 Web 或 bootstrap 容器。
+
+请勿将初始化令牌放入 URL、截图、浏览器书签或版本库。丢失令牌但尚未创建用户时，可在部署环境中替换 `DRAWNIX_STORE_SETUP_TOKEN` 后重建 API 容器。已有用户时修改该值不影响登录，也不会重新开放初始化入口。
+
+需要支持多用户自助注册时，显式设置 `DRAWNIX_STORE_REGISTRATION_ENABLED=true` 并重建 API 容器；该模式下 `/setup` 不可用。切回 `false` 会保留现有用户，仅关闭后续普通注册。
+
 `POCKETBASE_ENCRYPTION` 必须是安全随机的 32 字节值。示例中的值仅用于通过长度校验，部署前必须替换；更换现有生产数据卷的加密值会使旧数据不可读。
 
 PocketBase 当前固定为已验证的 `0.39.8`。升级镜像前必须在独立数据卷上检查 `pocketbase-init`、`drawnixstore-bootstrap`、`pocketbase` 健康状态，并验证注册登录、Canvas 保存和 SVG 分享；失败时应回退到已验证的镜像 digest。

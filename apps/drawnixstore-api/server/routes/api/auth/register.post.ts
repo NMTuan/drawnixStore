@@ -3,6 +3,7 @@ import { createError, defineHandler, readBody } from 'h3';
 import {
   assertTrustedOrigin,
   createUserPocketBase,
+  isRegistrationEnabled,
   setSession,
   sessionUser,
   toApiError,
@@ -16,6 +17,8 @@ interface RegisterBody {
 
 export default defineHandler(async (event) => {
   assertTrustedOrigin(event);
+  if (!isRegistrationEnabled())
+    throw createError({ statusCode: 403, statusMessage: '当前部署未开放注册。' });
   const body = (await readBody<RegisterBody>(event)) || {};
   const email = typeof body.email === 'string' ? body.email.trim() : '';
   const password = typeof body.password === 'string' ? body.password : '';
