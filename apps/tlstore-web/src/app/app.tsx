@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { pb, pocketBaseUrl, tlstoreApiUrl } from '../pocketbase';
+import { bff } from '../bff-client';
 import { CanvasEditor, type PendingCanvasSave } from './canvas-editor';
 import { CanvasSvg } from './canvas-svg';
 import { ConfirmDialog, ShareDialog, TextDialog } from './dialogs';
@@ -49,16 +49,9 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-/** 使用浏览器安全随机源生成 192 位 bearer token，避免可预测的公开链接。 */
-function createShareToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-/** 从已配置的 API 根地址构造嵌入 SVG URL，不将 token 发送给 PocketBase 公共接口。 */
+/** 分享 SVG 始终由同源 BFF 返回，浏览器不直接连接 PocketBase。 */
 function embedSvgUrl(token: string): string {
-  return `${tlstoreApiUrl?.replace(/\/$/, '') || window.location.origin}/embed/${token}.svg`;
+  return `${window.location.origin}/embed/${token}.svg`;
 }
 
 /** 匿名分享页仅加载 SVG 图片，不能读取 Canvas JSON 或挂载编辑器。 */
@@ -77,7 +70,7 @@ function ShareCanvasPage({ token }: { token: string }) {
 /** 提供账户入口、工作区与 Canvas 管理，并根据 URL 打开唯一资源。 */
 export function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
-  const [authenticated, setAuthenticated] = useState(pb.authStore.isValid);
+  const [authenticated, setAuthenticated] = useState(false);
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(null);
   const [canvases, setCanvases] = useState<CanvasRecord[]>([]);
@@ -96,20 +89,27 @@ export function App() {
     return () => window.removeEventListener('popstate', syncPath);
   }, []);
 
-  useEffect(() => pb.authStore.onChange(() => setAuthenticated(pb.authStore.isValid), true), []);
+  useEffect(() => {
+    let active = true;
+    void bff
+      .session()
+      .then(() => active && setAuthenticated(true))
+      .catch(() => active && setAuthenticated(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /** 根据当前 URL 加载工作区或 Canvas，PocketBase rule 会拒绝非 owner 请求。 */
   async function loadPath(requestId: number) {
     const canvasId = pathname.match(/^\/canvases\/([^/]+)$/)?.[1];
     const workspaceId = pathname.match(/^\/workspaces\/([^/]+)$/)?.[1];
     try {
-      const records = await pb
-        .collection('workspaces')
-        .getFullList<WorkspaceRecord>({ sort: '-created' });
+      const records = await bff.listWorkspaces();
       if (requestId !== loadRequestIdRef.current) return;
       setWorkspaces(records);
       if (canvasId) {
-        const target = await pb.collection('canvases').getOne<CanvasRecord>(canvasId);
+        const target = await bff.getCanvas(canvasId);
         if (requestId !== loadRequestIdRef.current) return;
         const ownerWorkspace = records.find((item) => item.id === target.workspace);
         if (!ownerWorkspace) throw new Error('找不到该画布所属的工作区。');
@@ -148,9 +148,7 @@ export function App() {
 
   /** 进入工作区只更新 last_accessed，不改变按创建时间排列的导航顺序。 */
   async function selectWorkspace(next: WorkspaceRecord, view: CanvasView, requestId?: number) {
-    const updated = await pb.collection('workspaces').update<WorkspaceRecord>(next.id, {
-      last_accessed: new Date().toISOString(),
-    });
+    const updated = await bff.updateWorkspace(next.id, { lastAccessed: new Date().toISOString() });
     if (requestId !== undefined && requestId !== loadRequestIdRef.current) return;
     setWorkspace(updated);
     setCanvas(null);
@@ -160,26 +158,15 @@ export function App() {
 
   /** 活跃与归档状态使用同一列表规则，始终按最后更新时间倒序。 */
   async function loadCanvases(workspaceId: string, view: CanvasView, requestId?: number) {
-    const records = await pb.collection('canvases').getFullList<CanvasRecord>({
-      filter: pb.filter('workspace = {:workspace} && archived = {:archived}', {
-        workspace: workspaceId,
-        archived: view === 'archived',
-      }),
-      sort: '-updated',
-    });
+    const records = await bff.listCanvases(workspaceId, view === 'archived');
     if (requestId !== undefined && requestId !== loadRequestIdRef.current) return;
     setCanvases(records);
   }
 
   /** 创建工作区后立即进入，避免用户还需在侧栏定位新记录。 */
   async function createWorkspace(name: string) {
-    if (!pb.authStore.record) return;
     try {
-      const created = await pb.collection('workspaces').create<WorkspaceRecord>({
-        owner: pb.authStore.record.id,
-        name,
-        last_accessed: new Date().toISOString(),
-      });
+      const created = await bff.createWorkspace(name);
       setWorkspaces((current) => [created, ...current]);
       navigate(`/workspaces/${created.id}`);
     } catch (cause) {
@@ -192,9 +179,7 @@ export function App() {
   async function renameWorkspace(name: string) {
     if (!workspace || name === workspace.name) return;
     try {
-      const updated = await pb
-        .collection('workspaces')
-        .update<WorkspaceRecord>(workspace.id, { name });
+      const updated = await bff.updateWorkspace(workspace.id, { name });
       setWorkspace(updated);
       setWorkspaces((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (cause) {
@@ -205,19 +190,13 @@ export function App() {
 
   /** 新 Canvas 从稳定的空白 Drawnix 快照开始，保证首次打开就能恢复。 */
   async function createCanvas() {
-    if (!workspace || !pb.authStore.record) return;
+    if (!workspace) return;
     try {
-      const created = await pb.collection('canvases').create<CanvasRecord>({
-        owner: pb.authStore.record.id,
-        workspace: workspace.id,
-        title: '未命名画布',
-        snapshot: serializeCanvasSnapshot(createEmptyCanvasSnapshot()),
-        preview_svg: '',
-        share_token: '',
-        share_enabled: false,
-        archived: false,
-        revision: 0,
-      });
+      const created = await bff.createCanvas(
+        workspace.id,
+        '未命名画布',
+        serializeCanvasSnapshot(createEmptyCanvasSnapshot())
+      );
       navigate(`/canvases/${created.id}`);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -228,9 +207,7 @@ export function App() {
   async function renameCanvas(target: CanvasRecord, name: string) {
     if (name === target.title) return;
     try {
-      const updated = await pb
-        .collection('canvases')
-        .update<CanvasRecord>(target.id, { title: name });
+      const updated = await bff.updateCanvas(target.id, { title: name });
       setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       if (canvas?.id === updated.id) setCanvas(updated);
     } catch (cause) {
@@ -242,7 +219,7 @@ export function App() {
   /** 归档保留快照与审计时间，成功后返回当前工作区的活跃列表。 */
   async function archiveCanvas(target: CanvasRecord) {
     try {
-      await pb.collection('canvases').update<CanvasRecord>(target.id, { archived: true });
+      await bff.updateCanvas(target.id, { archived: true });
       if (workspace) await loadCanvases(workspace.id, canvasView);
       if (canvas?.id === target.id) navigate(`/workspaces/${target.workspace}`);
     } catch (cause) {
@@ -254,7 +231,7 @@ export function App() {
   /** 恢复归档 Canvas 后重新加载当前归档视图，使该记录立即从列表移除。 */
   async function restoreCanvas(target: CanvasRecord) {
     try {
-      await pb.collection('canvases').update<CanvasRecord>(target.id, { archived: false });
+      await bff.updateCanvas(target.id, { archived: false });
       if (workspace) await loadCanvases(workspace.id, 'archived');
     } catch (cause) {
       setError(errorMessage(cause));
@@ -265,19 +242,24 @@ export function App() {
   async function saveCanvas(save: PendingCanvasSave) {
     if (!canvas) throw new Error('当前画布已关闭，无法保存。');
     try {
-      const update: Partial<CanvasRecord> = {
+      const update: {
+        snapshot: string;
+        revision: number;
+        previewSvg?: string;
+        shareEnabled?: boolean;
+      } = {
         snapshot: save.snapshot,
         revision: canvas.revision + 1,
       };
       // 图片会以内嵌 Data URL 进入 SVG；超限时关闭分享，避免旧预览继续公开。
       if (save.previewSvg && save.previewSvg.length > 10_000_000) {
-        update.preview_svg = '';
-        update.share_enabled = false;
+        update.previewSvg = '';
+        update.shareEnabled = false;
         setError('SVG 预览超过 10 MB，已保存画布快照并关闭分享。');
       } else if (save.previewSvg) {
-        update.preview_svg = save.previewSvg;
+        update.previewSvg = save.previewSvg;
       }
-      const updated = await pb.collection('canvases').update<CanvasRecord>(canvas.id, update);
+      const updated = await bff.updateCanvas(canvas.id, update);
       setCanvas(updated);
       setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (cause) {
@@ -289,11 +271,8 @@ export function App() {
   /** 确保 Canvas 拥有稳定的分享 token；仅打开弹窗时生成，默认仍保持关闭。 */
   async function openShare(target: CanvasRecord) {
     try {
-      const token = target.share_token || createShareToken();
-      const updated = target.share_token
-        ? target
-        : await pb.collection('canvases').update<CanvasRecord>(target.id, { share_token: token });
-      if (!target.share_token) {
+      const updated = await bff.ensureShare(target.id);
+      if (updated.share_token !== target.share_token) {
         setCanvas((current) => (current?.id === updated.id ? updated : current));
         setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       }
@@ -306,9 +285,7 @@ export function App() {
   /** 更新唯一的公开访问开关；API 每次请求都会读取它，因此关闭立即生效。 */
   async function setShareEnabled(target: CanvasRecord, shareEnabled: boolean) {
     try {
-      const updated = await pb.collection('canvases').update<CanvasRecord>(target.id, {
-        share_enabled: shareEnabled,
-      });
+      const updated = await bff.updateCanvas(target.id, { shareEnabled });
       setCanvas((current) => (current?.id === updated.id ? updated : current));
       setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setShareCanvas(updated);
@@ -320,8 +297,18 @@ export function App() {
 
   const shareToken = pathname.match(/^\/share\/([a-f0-9]{48})$/)?.[1];
   if (shareToken) return <ShareCanvasPage token={shareToken} />;
-  if (!pocketBaseUrl) return <main className="notice-page">缺少 `VITE_POCKETBASE_URL` 配置。</main>;
-  if (!authenticated) return <AuthScreen error={error} onError={setError} />;
+  if (!authenticated)
+    return (
+      <AuthScreen
+        error={error}
+        onAuthenticated={() => {
+          setError('');
+          setAuthenticated(true);
+        }}
+        onClearError={() => setError('')}
+        onError={setError}
+      />
+    );
 
   if (canvas) {
     return (
@@ -386,7 +373,12 @@ export function App() {
             className="icon-button"
             title="退出登录"
             type="button"
-            onClick={() => pb.authStore.clear()}
+            onClick={() =>
+              void bff
+                .logout()
+                .then(() => setAuthenticated(false))
+                .catch((cause) => setError(errorMessage(cause)))
+            }
           >
             <LogOut aria-hidden="true" size={18} />
           </button>
@@ -707,18 +699,29 @@ function ArchiveDialog({
 }
 
 /** 提供参考项目同等的邮箱密码登录与注册入口。 */
-function AuthScreen({ error, onError }: { error: string; onError: (message: string) => void }) {
+function AuthScreen({
+  error,
+  onAuthenticated,
+  onClearError,
+  onError,
+}: {
+  error: string;
+  onAuthenticated: () => void;
+  onClearError: () => void;
+  onError: (message: string) => void;
+}) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    onClearError();
     setSubmitting(true);
     try {
-      if (mode === 'register')
-        await pb.collection('users').create({ email, password, passwordConfirm: password });
-      await pb.collection('users').authWithPassword(email, password);
+      if (mode === 'register') await bff.register(email, password);
+      else await bff.login(email, password);
+      onAuthenticated();
     } catch (cause) {
       onError(errorMessage(cause));
     } finally {

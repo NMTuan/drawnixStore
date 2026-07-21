@@ -68,8 +68,9 @@ PocketBase 可以继续承担认证和数据存储，也可以由独立业务 AP
 - 私有 Workspace 和 Canvas 仅 owner 可读写。
 - Canvas 创建和更新必须校验 Workspace owner。
 - 公开读取仅在 `share_enabled = true`、token 非空且与请求 token 匹配时成立。
-- 前端不得持有管理员凭据。
-- API URL 从环境变量获取；浏览器与服务端使用不同变量名和最小权限地址。
+- 浏览器不得持有 PocketBase URL、用户 token 或管理员凭据；仅请求同源 `/api` 与 `/embed`。
+- Nitro BFF 以 HttpOnly Cookie 保存 PocketBase 用户 token；每个受保护请求新建用户客户端并调用 `authRefresh`，继续由 PocketBase owner rule 授权。
+- 写请求必须验证固定 `Origin` 并在生产环境使用 `Secure; SameSite=Lax` Cookie；公开 SVG 维持匿名最小查询范围。
 
 ## 分享与嵌入
 

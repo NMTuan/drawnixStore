@@ -11,5 +11,9 @@ export default defineConfig({
     pocketbaseInternalUrl: '',
     pocketbaseSuperuserEmail: '',
     pocketbaseSuperuserPassword: '',
+    // BFF 写请求只接受的固定浏览器来源，禁止从 Host 请求头推导可信来源。
+    webOrigin: 'http://localhost:7300',
+    // 生产必须为 true，开发 HTTP 环境显式使用 false 以避免浏览器拒绝 __Host- Cookie。
+    sessionSecure: false,
   },
 });

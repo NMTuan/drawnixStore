@@ -1,24 +1,70 @@
-# tlStore 生产编排：PocketBase 由受管服务或独立容器提供，绝不向浏览器暴露管理员凭据。
+# tlStore 生产编排：Web 仅供外部 HTTPS 反向代理访问，PocketBase 与 API 始终留在私有网络。
 services:
+  pocketbase-init:
+    image: ghcr.io/muchobien/pocketbase:0.27.0
+    entrypoint: ["pocketbase"]
+    command: ["superuser", "upsert", "${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}", "${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}", "--dir", "/pb_data", "--encryptionEnv", "ENCRYPTION"]
+    environment:
+      ENCRYPTION: ${POCKETBASE_ENCRYPTION:?请设置 PocketBase 数据加密密钥}
+    volumes:
+      - tlstore-pocketbase-data:/pb_data
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:0.27.0
+    command: ["--encryptionEnv", "ENCRYPTION"]
+    depends_on:
+      pocketbase-init:
+        condition: service_completed_successfully
+    environment:
+      ENCRYPTION: ${POCKETBASE_ENCRYPTION:?请设置 PocketBase 数据加密密钥}
+      PB_HOST: 0.0.0.0
+      PB_PORT: 8090
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    volumes:
+      - tlstore-pocketbase-data:/pb_data
+  tlstore-bootstrap:
+    build:
+      context: ../..
+      dockerfile: apps/tlstore-api/dockerfile
+      target: bootstrap
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    environment:
+      NITRO_POCKETBASE_INTERNAL_URL: http://pocketbase:8090
+      NITRO_POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
+      NITRO_POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
+      POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
+      POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
   tlstore-api:
     build:
       context: ../..
       dockerfile: apps/tlstore-api/dockerfile
+    depends_on:
+      tlstore-bootstrap:
+        condition: service_completed_successfully
     environment:
-      NITRO_POCKETBASE_INTERNAL_URL: ${NITRO_POCKETBASE_INTERNAL_URL:?请设置 PocketBase 内网地址}
+      NITRO_POCKETBASE_INTERNAL_URL: http://pocketbase:8090
       NITRO_POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
       NITRO_POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
+      NITRO_WEB_ORIGIN: ${TLSTORE_PUBLIC_ORIGIN:?请设置 tlStore 公开 HTTPS 地址}
+      # HTTPS 生产环境必须为 true；仅受控的本地 HTTP 调试可显式设为 false。
+      NITRO_SESSION_SECURE: ${NITRO_SESSION_SECURE:-true}
     restart: unless-stopped
-
   tlstore-web:
     build:
       context: ../..
       dockerfile: apps/tlstore-web/dockerfile
-      args:
-        VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL:?请设置浏览器可访问的 PocketBase URL}
-        VITE_TLSTORE_API_URL: ''
     depends_on:
-      - tlstore-api
+      tlstore-api:
+        condition: service_started
     ports:
-      - '${TLSTORE_WEB_PORT:-7300}:80'
+      - '${TLSTORE_WEB_BIND:-0.0.0.0}:${TLSTORE_WEB_PORT:-7300}:80'
     restart: unless-stopped
+volumes:
+  tlstore-pocketbase-data:

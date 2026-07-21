@@ -11,7 +11,8 @@ export default defineConfig({
     host: 'localhost',
     port: 7300,
     proxy: {
-      // 本地分享链接保持 Web 同源，由 Vite 转发至独立 Nitro SVG 服务。
+      // 本地 BFF 与分享链接保持 Web 同源，由 Vite 转发至独立 Nitro 服务。
+      '/api': { target: 'http://127.0.0.1:7400', changeOrigin: true },
       '/embed': { target: 'http://127.0.0.1:7400', changeOrigin: true },
     },
   },
