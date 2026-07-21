@@ -1,7 +1,0 @@
-# tlStore 浏览器运行镜像：静态产物必须由宿主机的 build:tlstore-images 预先生成。
-FROM nginx:1.27-alpine
-
-COPY apps/tlstore-web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY dist/apps/tlstore-web /usr/share/nginx/html
-
-EXPOSE 80

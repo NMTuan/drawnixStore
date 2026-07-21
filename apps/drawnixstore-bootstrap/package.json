@@ -1,0 +1,9 @@
+{
+  "name": "@drawnixstore/bootstrap",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "pocketbase": "^0.27.0"
+  }
+}

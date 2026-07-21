@@ -19,7 +19,7 @@
       "@drawnix/drawnix": ["packages/drawnix/src/index.ts"],
       "@plait-board/react-board": ["packages/react-board/src/index.ts"],
       "@plait-board/react-text": ["packages/react-text/src/index.ts"],
-      "@tlstore/domain": ["packages/tlstore-domain/src/index.ts"]
+      "@drawnixstore/domain": ["packages/drawnixstore-domain/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
