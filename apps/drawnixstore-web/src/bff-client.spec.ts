@@ -60,6 +60,31 @@ it('通过 BFF 登录而不在浏览器处理 PocketBase token', async () => {
   });
 });
 
+it('通过同源 BFF 提交一次性初始化令牌且不保存 token', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ user: { id: 'user-1', email: 'owner@example.com' } }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(bff.setup('owner@example.com', 'password-123', 'setup-token')).resolves.toEqual({
+    id: 'user-1',
+    email: 'owner@example.com',
+  });
+  expect(fetchMock).toHaveBeenCalledWith('/api/auth/setup', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'owner@example.com',
+      password: 'password-123',
+      token: 'setup-token',
+    }),
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+  });
+});
+
 it('通过受登录保护的 BFF 解析分享页编辑入口', async () => {
   const token = 'a'.repeat(48);
   const fetchMock = vi.fn().mockResolvedValue(

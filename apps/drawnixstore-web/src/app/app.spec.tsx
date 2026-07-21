@@ -7,6 +7,8 @@ const bffMock = vi.hoisted(() => ({
   listWorkspaces: vi.fn(),
   logout: vi.fn(),
   session: vi.fn(),
+  authEntryStatus: vi.fn(),
+  setup: vi.fn(),
   getSharedCanvasForEditing: vi.fn(),
 }));
 
@@ -20,6 +22,10 @@ describe('App', () => {
     bffMock.listWorkspaces.mockReset().mockResolvedValue([]);
     bffMock.logout.mockReset().mockResolvedValue(undefined);
     bffMock.session.mockReset().mockRejectedValue(new Error('未登录'));
+    bffMock.authEntryStatus
+      .mockReset()
+      .mockResolvedValue({ registrationEnabled: false, initialSetupAvailable: false });
+    bffMock.setup.mockReset();
     bffMock.getSharedCanvasForEditing.mockReset().mockRejectedValue(new Error('没有编辑权限'));
   });
 
@@ -27,6 +33,17 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('欢迎回来')).toBeTruthy();
+  });
+
+  it('没有用户且初始化可用时跳转至首账号创建页', async () => {
+    bffMock.authEntryStatus.mockResolvedValue({
+      registrationEnabled: false,
+      initialSetupAvailable: true,
+    });
+    render(<App />);
+
+    expect(await screen.findByText('创建首个账户')).toBeTruthy();
+    expect(window.location.pathname).toBe('/setup');
   });
 
   it('空工作区账户访问遗留 URL 时显示首次创建入口', async () => {

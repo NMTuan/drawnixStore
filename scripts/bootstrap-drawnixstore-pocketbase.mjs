@@ -10,6 +10,7 @@ config({ path: '.env.local', quiet: true });
 const baseUrl = process.env.POCKETBASE_INTERNAL_URL || process.env.NITRO_POCKETBASE_INTERNAL_URL;
 const email = process.env.POCKETBASE_SUPERUSER_EMAIL;
 const password = process.env.POCKETBASE_SUPERUSER_PASSWORD;
+const INITIAL_SETUP_RECORD_ID = 'initialsetup001';
 
 if (!baseUrl || !email || !password) throw new Error('缺少 PocketBase 初始化所需环境变量。');
 
@@ -29,10 +30,57 @@ async function ensureCollection(definition) {
   }
 }
 
+/** 启用仅供首账号创建使用的小型 PocketBase 批处理事务，避免跨实例初始化竞争。 */
+async function ensureBatchTransactions() {
+  const settings = await pb.settings.getAll();
+  if (settings.batch?.enabled) return;
+  await pb.settings.update({
+    batch: {
+      ...settings.batch,
+      enabled: true,
+      maxRequests: settings.batch?.maxRequests || 2,
+      timeout: settings.batch?.timeout || 3,
+      maxBodySize: settings.batch?.maxBodySize || 10_000,
+    },
+  });
+}
+
+/** 将内部初始化锁与已有用户状态对齐，升级已有部署时不会意外开放首账号创建。 */
+async function synchronizeInitialSetupClaim() {
+  const users = await pb.collection('users').getList(1, 1, { fields: 'id' });
+  try {
+    if (users.totalItems > 0) {
+      await pb.collection('drawnixstore_setup').create({ id: INITIAL_SETUP_RECORD_ID });
+      return;
+    }
+    await pb.collection('drawnixstore_setup').delete(INITIAL_SETUP_RECORD_ID);
+  } catch (error) {
+    // 固定记录已存在或尚不存在均是幂等同步的预期结果。
+    if (error instanceof ClientResponseError && error.status === 400) return;
+    if (error instanceof ClientResponseError && error.status === 404) return;
+    throw error;
+  }
+}
+
 /** 创建 Workspace 与 Canvas，并将每项读写严格限制到记录 owner。 */
 async function bootstrap() {
   await pb.collection('_superusers').authWithPassword(email, password);
+  await ensureBatchTransactions();
   const users = await pb.collections.getOne('users');
+  await ensureCollection({
+    // 初始化状态仅由服务器超级管理员读取，固定 ID 保证多实例只能申领一次。
+    name: 'drawnixstore_setup',
+    type: 'base',
+    listRule: null,
+    viewRule: null,
+    createRule: null,
+    updateRule: null,
+    deleteRule: null,
+    fields: [
+      { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
+      { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
+    ],
+  });
   const privateRules = {
     listRule: 'owner = @request.auth.id',
     viewRule: 'owner = @request.auth.id',
@@ -103,6 +151,7 @@ async function bootstrap() {
       { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
     ],
   });
+  await synchronizeInitialSetupClaim();
 }
 
 await bootstrap();

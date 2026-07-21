@@ -13,5 +13,9 @@ export default defineConfig({
     pocketbaseSuperuserPassword: '',
     // BFF 写请求只接受的固定浏览器来源，禁止从 Host 请求头推导可信来源。
     webOrigin: 'http://localhost:7300',
+    // 私有部署默认关闭公开注册；首个账号只能经由受服务端令牌保护的初始化端点创建。
+    registrationEnabled: false,
+    // 初始化令牌仅保存在服务端环境变量，绝不暴露给 Vite 或浏览器构建产物。
+    setupToken: '',
   },
 });
