@@ -50,8 +50,6 @@ services:
       NITRO_POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
       NITRO_POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
       NITRO_WEB_ORIGIN: ${DRAWNIX_STORE_PUBLIC_ORIGIN:?请设置 Drawnix Store 公开 HTTPS 地址}
-      # HTTPS 生产环境必须为 true；仅受控的本地 HTTP 调试可显式设为 false。
-      NITRO_SESSION_SECURE: ${NITRO_SESSION_SECURE:-true}
     restart: unless-stopped
   drawnixstore-web:
     image: ${DRAWNIX_STORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-web:${DRAWNIX_STORE_IMAGE_TAG:-latest}

@@ -11,9 +11,9 @@ docker compose --env-file .env.local -f compose.yml up -d
 
 默认镜像来自 `ghcr.io/nmtuan/drawnixstore`。生产部署应使用 GitHub Actions 成功发布后的 `sha-<短提交>` 不可变 `DRAWNIX_STORE_IMAGE_TAG`，确保 Web、API 与 bootstrap 来自同一提交；`latest` 仅适合测试。需要从 fork 或私有镜像仓库部署时覆盖 `DRAWNIX_STORE_IMAGE_REPOSITORY`。私有 GHCR 包需要先执行 `docker login ghcr.io`，或将包在 GitHub Packages 中设为公开。
 
-Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提供 `DRAWNIX_STORE_PUBLIC_ORIGIN` 所对应的 TLS 入口，再将流量转发到 `DRAWNIX_STORE_WEB_PORT`；不要直接暴露 HTTP 端口，否则浏览器会拒绝生产 Secure 会话 Cookie。
+Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提供 `DRAWNIX_STORE_PUBLIC_ORIGIN` 所对应的 TLS 入口，再将流量转发到 `DRAWNIX_STORE_WEB_PORT`；BFF 会根据该 URL 自动设置 Secure 会话 Cookie。
 
-仅限受控的局域网 HTTP 调试，可将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 设置为完整的 `http://主机地址:端口` 并将 `NITRO_SESSION_SECURE=false`。此模式不适用于公网或生产部署。
+仅限受控的局域网 HTTP 调试，可将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 设置为完整的 `http://主机地址:端口`；BFF 会自动使用不带 `Secure` 属性的 HttpOnly Cookie。此模式不适用于公网或生产部署。
 
 `POCKETBASE_ENCRYPTION` 必须是安全随机的 32 字节值。示例中的值仅用于通过长度校验，部署前必须替换；更换现有生产数据卷的加密值会使旧数据不可读。
 

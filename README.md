@@ -45,7 +45,7 @@ docker compose --env-file .env.local -f compose.yml up -d
 
 生产环境必须使用同一次 GitHub Actions 发布产生的 `sha-<短提交>` 作为 `DRAWNIX_STORE_IMAGE_TAG`，使 Web、API、Bootstrap 保持同一版本。`latest` 仅用于测试。
 
-Web 默认监听 `7300`，生产环境应由外部 HTTPS 反向代理将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 的流量转发至该端口。HTTPS 环境须保持 `NITRO_SESSION_SECURE=true`，否则浏览器不会安全地处理会话 Cookie。
+Web 默认监听 `7300`，生产环境应由外部 HTTPS 反向代理将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 的流量转发至该端口。BFF 会根据该公开 URL 自动设置会话 Cookie：HTTPS 使用 `Secure` Cookie，受控 HTTP 调试使用普通 HttpOnly Cookie。
 
 部署检查、数据卷和 PocketBase 升级边界见 [apps/drawnixstore-deployment/readme.md](apps/drawnixstore-deployment/readme.md)。
 
