@@ -28,6 +28,12 @@ export interface SessionUser {
   email: string;
 }
 
+/** 匿名访问时可安全读取的认证入口状态，不包含初始化令牌或用户数量。 */
+export interface AuthEntryStatus {
+  registrationEnabled: boolean;
+  initialSetupAvailable: boolean;
+}
+
 function workspaceRecord(workspace: ApiWorkspace): WorkspaceRecord {
   return {
     id: workspace.id,
@@ -79,6 +85,18 @@ export const bff = {
       await request<{ user: SessionUser }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
+      })
+    ).user;
+  },
+  async authEntryStatus(): Promise<AuthEntryStatus> {
+    return request<AuthEntryStatus>('/auth/setup-status');
+  },
+  /** 仅在服务端确认尚无用户且令牌有效时创建首账号；令牌绝不持久化到浏览器。 */
+  async setup(email: string, password: string, token: string): Promise<SessionUser> {
+    return (
+      await request<{ user: SessionUser }>('/auth/setup', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, token }),
       })
     ).user;
   },

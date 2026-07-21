@@ -16,6 +16,12 @@
       "options": {
         "command": "npx nitro dev --dir apps/drawnixstore-api"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run apps/drawnixstore-api/server"
+      }
     }
   }
 }
