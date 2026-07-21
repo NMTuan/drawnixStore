@@ -9,7 +9,7 @@ docker compose --env-file .env.local -f compose.yml pull
 docker compose --env-file .env.local -f compose.yml up -d
 ```
 
-默认镜像来自 `ghcr.io/nmtuan/drawnixstore`。生产部署应使用 GitHub Actions 成功发布后的 `sha-<短提交>` 不可变 `TLSTORE_IMAGE_TAG`，确保 Web、API 与 bootstrap 来自同一提交；`latest` 仅适合测试。需要从 fork 或私有镜像仓库部署时覆盖 `TLSTORE_IMAGE_REPOSITORY`。私有 GHCR 包需要先执行 `docker login ghcr.io`，或将包在 GitHub Packages 中设为公开。
+默认镜像来自 `ghcr.io/nmtuan/drawnixstore`。生产部署应使用 GitHub Actions 成功发布后的 `sha-<短提交>` 不可变 `DRAWNIX_STORE_IMAGE_TAG`，确保 Web、API 与 bootstrap 来自同一提交；`latest` 仅适合测试。需要从 fork 或私有镜像仓库部署时覆盖 `DRAWNIX_STORE_IMAGE_REPOSITORY`。私有 GHCR 包需要先执行 `docker login ghcr.io`，或将包在 GitHub Packages 中设为公开。
 
 Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提供 `TLSTORE_PUBLIC_ORIGIN` 所对应的 TLS 入口，再将流量转发到 `TLSTORE_WEB_PORT`；不要直接暴露 HTTP 端口，否则浏览器会拒绝生产 Secure 会话 Cookie。
 

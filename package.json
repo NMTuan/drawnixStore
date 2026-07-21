@@ -11,7 +11,7 @@
     "format:check": "oxfmt --check",
     "build:web": "nx build web",
     "build:tlstore-api": "nx build tlstore-api",
-    "build:tlstore-images": "npm run build:tlstore-api && nx build tlstore-web",
+    "build:drawnix-store-images": "npm run build:tlstore-api && nx build tlstore-web",
     "start:tlstore-api": "nx serve tlstore-api",
     "test": "nx run-many -t=test",
     "bootstrap:tlstore": "node scripts/bootstrap-tlstore-pocketbase.mjs",
