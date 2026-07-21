@@ -2,18 +2,31 @@
 
 此编排运行浏览器应用、Nitro BFF、PocketBase、超级管理员初始化和一次性 Schema bootstrap。浏览器只请求 Web 同源的 `/api` 与 `/embed`。
 
-将 `compose.yml` 和 `.env.example` 复制到任意部署目录，再将 `.env.example` 填写为 `.env.local`。部署主机不需要仓库源码或 Node 工具链，只需拉取已发布镜像并启动：
+将 `compose.yml` 和 `.env.example` 复制到任意部署目录，再将 `.env.example` 填写为 `.env`。Docker Compose 会自动读取同目录 `.env` 文件；若命名为 `.env.local`，每个命令都必须传入 `--env-file .env.local`。部署主机不需要仓库源码或 Node 工具链，只需拉取已发布镜像并启动：
 
 ```bash
-docker compose --env-file .env.local -f compose.yml pull
-docker compose --env-file .env.local -f compose.yml up -d
+docker compose -f compose.yml pull
+docker compose -f compose.yml up -d
 ```
 
 默认镜像来自 `ghcr.io/nmtuan/drawnixstore`。生产部署应使用 GitHub Actions 成功发布后的 `sha-<短提交>` 不可变 `DRAWNIX_STORE_IMAGE_TAG`，确保 Web、API 与 bootstrap 来自同一提交；`latest` 仅适合测试。需要从 fork 或私有镜像仓库部署时覆盖 `DRAWNIX_STORE_IMAGE_REPOSITORY`。私有 GHCR 包需要先执行 `docker login ghcr.io`，或将包在 GitHub Packages 中设为公开。
 
-Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提供 `DRAWNIX_STORE_PUBLIC_ORIGIN` 所对应的 TLS 入口，再将流量转发到 `DRAWNIX_STORE_WEB_PORT`；BFF 会根据该 URL 自动设置 Secure 会话 Cookie。
+Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提供 `DRAWNIX_STORE_PUBLIC_ORIGIN` 所对应的 TLS 入口，再将流量转发到 `DRAWNIX_STORE_WEB_PORT`。`DRAWNIX_STORE_PUBLIC_ORIGIN` 必须与浏览器实际访问的完整协议、主机和端口一致。
 
-仅限受控的局域网 HTTP 调试，可将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 设置为完整的 `http://主机地址:端口`；BFF 会自动使用不带 `Secure` 属性的 HttpOnly Cookie。此模式不适用于公网或生产部署。
+仅限受控的局域网 HTTP 调试，可将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 设置为完整的 `http://主机地址:端口`。此模式不适用于公网或生产部署。
+
+会话 Cookie 配置取决于镜像版本：
+
+- `v0.2.0`：`NITRO_SESSION_SECURE` 显式控制 Cookie 是否带 `Secure` 属性。HTTPS 入口必须设为 `true`；HTTP 调试入口必须设为 `false`。若 HTTP 入口错误设为 `true`，浏览器会拒绝 `Secure` Cookie，注册或登录虽会成功，但后续 `/api/workspaces` 会因未携带会话 Cookie 返回 `401`。
+- `v0.2.0` 之后的镜像：不再使用 `NITRO_SESSION_SECURE`，BFF 根据 `DRAWNIX_STORE_PUBLIC_ORIGIN` 自动判断。HTTPS 使用 `Secure` Cookie，HTTP 使用普通 HttpOnly Cookie。
+
+修改会话 Cookie 配置后，先重建 API 容器，再清除浏览器中该公开地址的站点 Cookie 并重新登录：
+
+```bash
+docker compose -f compose.yml up -d --force-recreate drawnixstore-api
+```
+
+若使用 `.env.local`，在上述命令的 `docker compose` 后加入 `--env-file .env.local`。
 
 `POCKETBASE_ENCRYPTION` 必须是安全随机的 32 字节值。示例中的值仅用于通过长度校验，部署前必须替换；更换现有生产数据卷的加密值会使旧数据不可读。
 

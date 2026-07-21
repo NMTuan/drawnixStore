@@ -33,12 +33,12 @@ drawnixstore-bootstrap -- one-shot --> PocketBase collections
 GitHub Actions 会发布 Web、API、Bootstrap 三个多架构镜像到 GHCR。部署主机不需要仓库源码、Node.js 或本地构建环境。
 
 1. 下载 [compose.yml](apps/drawnixstore-deployment/compose.yml) 和 [.env.example](apps/drawnixstore-deployment/.env.example) 到部署目录。
-2. 将 `.env.example` 改名为 `.env.local`，填写管理员凭据、32 字节 `POCKETBASE_ENCRYPTION`、公开 HTTPS 地址和镜像标签。
+2. 将 `.env.example` 改名为 `.env`，填写管理员凭据、32 字节 `POCKETBASE_ENCRYPTION`、公开 HTTPS 地址和镜像标签。若使用 `.env.local`，每个 Compose 命令都必须传入 `--env-file .env.local`。
 3. 拉取并启动服务：
 
 ```bash
-docker compose --env-file .env.local -f compose.yml pull
-docker compose --env-file .env.local -f compose.yml up -d
+docker compose -f compose.yml pull
+docker compose -f compose.yml up -d
 ```
 
 默认镜像前缀为 `ghcr.io/nmtuan/drawnixstore`。部署 fork 或私有 GHCR 包时，通过 `DRAWNIX_STORE_IMAGE_REPOSITORY` 覆盖；私有包需先执行 `docker login ghcr.io`。
