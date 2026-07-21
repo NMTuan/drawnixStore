@@ -59,3 +59,20 @@ it('通过 BFF 登录而不在浏览器处理 PocketBase token', async () => {
     headers: { 'Content-Type': 'application/json' },
   });
 });
+
+it('通过受登录保护的 BFF 解析分享页编辑入口', async () => {
+  const token = 'a'.repeat(48);
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ canvasId: 'canvas-1' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(bff.getSharedCanvasForEditing(token)).resolves.toBe('canvas-1');
+  expect(fetchMock).toHaveBeenCalledWith(`/api/share/${token}`, {
+    credentials: 'same-origin',
+    headers: {},
+  });
+});

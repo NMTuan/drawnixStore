@@ -54,13 +54,44 @@ function embedSvgUrl(token: string): string {
   return `${window.location.origin}/embed/${token}.svg`;
 }
 
-/** 匿名分享页仅加载 SVG 图片，不能读取 Canvas JSON 或挂载编辑器。 */
-function ShareCanvasPage({ token }: { token: string }) {
+/** 匿名分享页仅加载 SVG 图片；登录 owner 可通过 BFF 确认后进入自身画布编辑器。 */
+function ShareCanvasPage({ token, authenticated }: { token: string; authenticated: boolean }) {
+  const [canvasId, setCanvasId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setCanvasId(null);
+    if (!authenticated)
+      return () => {
+        active = false;
+      };
+    void bff
+      .getSharedCanvasForEditing(token)
+      .then((id) => active && setCanvasId(id))
+      // 非 owner、关闭分享与失效链接均不展示编辑操作。
+      .catch(() => active && setCanvasId(null));
+    return () => {
+      active = false;
+    };
+  }, [authenticated, token]);
+
   return (
     <main className="share-page">
       <header>
         <strong>Drawnix Store</strong>
-        <span>只读分享</span>
+        <div className="share-page__actions">
+          <span>只读分享</span>
+          {canvasId && (
+            <button
+              className="button button--primary"
+              type="button"
+              onClick={() => navigate(`/canvases/${canvasId}`)}
+            >
+              <Pencil aria-hidden="true" size={16} />
+              编辑画布
+            </button>
+          )}
+        </div>
       </header>
       <img alt="Canvas preview" src={embedSvgUrl(token)} />
     </main>
@@ -93,8 +124,14 @@ export function App() {
     let active = true;
     void bff
       .session()
-      .then(() => active && setAuthenticated(true))
-      .catch(() => active && setAuthenticated(false));
+      .then(() => {
+        if (!active) return;
+        setAuthenticated(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAuthenticated(false);
+      });
     return () => {
       active = false;
     };
@@ -301,7 +338,7 @@ export function App() {
   }
 
   const shareToken = pathname.match(/^\/share\/([a-f0-9]{48})$/)?.[1];
-  if (shareToken) return <ShareCanvasPage token={shareToken} />;
+  if (shareToken) return <ShareCanvasPage authenticated={authenticated} token={shareToken} />;
   if (!authenticated)
     return (
       <AuthScreen
@@ -350,6 +387,7 @@ export function App() {
           <ShareDialog
             embedUrl={embedSvgUrl(shareCanvas.share_token)}
             enabled={shareCanvas.share_enabled}
+            title={shareCanvas.title}
             url={`${window.location.origin}/share/${shareCanvas.share_token}`}
             onClose={() => setShareCanvas(null)}
             onEnabledChange={(enabled) => setShareEnabled(shareCanvas, enabled)}
@@ -381,7 +419,9 @@ export function App() {
             onClick={() =>
               void bff
                 .logout()
-                .then(() => setAuthenticated(false))
+                .then(() => {
+                  setAuthenticated(false);
+                })
                 .catch((cause) => setError(errorMessage(cause)))
             }
           >
@@ -532,6 +572,7 @@ export function App() {
         <ShareDialog
           embedUrl={embedSvgUrl(shareCanvas.share_token)}
           enabled={shareCanvas.share_enabled}
+          title={shareCanvas.title}
           url={`${window.location.origin}/share/${shareCanvas.share_token}`}
           onClose={() => setShareCanvas(null)}
           onEnabledChange={(enabled) => setShareEnabled(shareCanvas, enabled)}
