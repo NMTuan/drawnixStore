@@ -1,6 +1,6 @@
 {
-  "name": "@drawnix/source",
-  "version": "0.0.2",
+  "name": "@drawnixstore/source",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -10,11 +10,11 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "build:web": "nx build web",
-    "build:tlstore-api": "nx build tlstore-api",
-    "build:drawnix-store-images": "npm run build:tlstore-api && nx build tlstore-web",
-    "start:tlstore-api": "nx serve tlstore-api",
+    "build:drawnixstore-api": "nx build drawnixstore-api",
+    "build:drawnix-store-images": "npm run build:drawnixstore-api && nx build drawnixstore-web",
+    "start:drawnixstore-api": "nx serve drawnixstore-api",
     "test": "nx run-many -t=test",
-    "bootstrap:tlstore": "node scripts/bootstrap-tlstore-pocketbase.mjs",
+    "bootstrap:drawnixstore": "node scripts/bootstrap-drawnixstore-pocketbase.mjs",
     "release": "node scripts/release-version.js",
     "pub": "npm run build && node scripts/publish.js"
   },

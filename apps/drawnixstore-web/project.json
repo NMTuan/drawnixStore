@@ -1,0 +1,8 @@
+{
+  "name": "drawnixstore-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/drawnixstore-web/src",
+  "projectType": "application",
+  "tags": ["scope:drawnixstore"],
+  "targets": {}
+}
