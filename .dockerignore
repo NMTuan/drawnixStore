@@ -2,10 +2,10 @@
 .nx
 dist/*
 !dist/apps/
-!dist/apps/tlstore-api/
-!dist/apps/tlstore-api/**
-!dist/apps/tlstore-web/
-!dist/apps/tlstore-web/**
+!dist/apps/drawnixstore-api/
+!dist/apps/drawnixstore-api/**
+!dist/apps/drawnixstore-web/
+!dist/apps/drawnixstore-web/**
 node_modules
 .env.local
 **/.env.local

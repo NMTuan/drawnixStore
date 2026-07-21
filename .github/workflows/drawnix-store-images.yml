@@ -62,7 +62,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/tlstore-web/dockerfile
+          file: apps/drawnixstore-web/dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.web-meta.outputs.tags }}
@@ -83,7 +83,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/tlstore-api/dockerfile
+          file: apps/drawnixstore-api/dockerfile
           target: runtime
           platforms: linux/amd64,linux/arm64
           push: true
@@ -105,7 +105,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/tlstore-api/dockerfile
+          file: apps/drawnixstore-api/dockerfile
           target: bootstrap
           platforms: linux/amd64,linux/arm64
           push: true

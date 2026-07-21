@@ -8,10 +8,10 @@
 本仓库是 Drawnix 的 fork，首要目标是能够持续同步上游更新。
 
 - 禁止直接修改 `packages/drawnix`、`packages/react-board`、`packages/react-text` 及其他上游核心包的业务源码、样式、构建配置或测试，除非用户明确批准并记录无法通过公开 API 实现的原因。
-- 业务能力必须放在独立的 `apps/tlstore-*`、`packages/tlstore-*` 或仓库外独立服务中；通过 `@drawnix/drawnix` 的公开导出、Props、回调和插件机制集成。
+- 业务能力必须放在独立的 `apps/drawnixstore-*`、`packages/drawnixstore-*` 或仓库外独立服务中；通过 `@drawnix/drawnix` 的公开导出、Props、回调和插件机制集成。
 - 不要复制、补丁或 fork Drawnix 内部实现；不要依赖未导出的内部路径、DOM 结构、私有 CSS class 或非文档化状态。
 - 新增依赖必须局限在业务应用或业务包。升级 Drawnix 或 Plait 前先验证公开 API、序列化数据与端到端工作流。
-- 上游同步前后必须运行 `npm run build`、相关测试，并检查 `apps/tlstore-*` 对公开 API 的兼容性。
+- 上游同步前后必须运行 `npm run build`、相关测试，并检查 `apps/drawnixstore-*` 对公开 API 的兼容性。
 
 ## 文档与注释
 
