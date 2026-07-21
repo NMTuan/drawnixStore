@@ -15,6 +15,7 @@ import App from './app';
 
 describe('App', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/');
     bffMock.listWorkspaces.mockReset().mockResolvedValue([]);
     bffMock.logout.mockReset().mockResolvedValue(undefined);
     bffMock.session.mockReset().mockRejectedValue(new Error('未登录'));
@@ -24,6 +25,16 @@ describe('App', () => {
     render(<App />);
 
     expect(await screen.findByText('欢迎回来')).toBeTruthy();
+  });
+
+  it('空工作区账户访问遗留 URL 时显示首次创建入口', async () => {
+    window.history.replaceState({}, '', '/workspaces/previous-user-workspace');
+    bffMock.session.mockResolvedValue({ id: 'user-1', email: 'user@example.com' });
+    render(<App />);
+
+    expect(await screen.findByText('创建第一个工作区')).toBeTruthy();
+    expect(screen.queryByText('找不到该工作区。')).toBeNull();
+    expect(window.location.pathname).toBe('/');
   });
 
   it('登出失败时保留当前会话并显示错误', async () => {

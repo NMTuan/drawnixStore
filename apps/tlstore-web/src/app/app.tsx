@@ -120,6 +120,11 @@ export function App() {
       }
       if (workspaceId) {
         const target = records.find((item) => item.id === workspaceId);
+        // 新账户可能继承登录前浏览器保留的其他用户工作区 URL，此时回到首次使用界面。
+        if (records.length === 0) {
+          navigate('/');
+          return;
+        }
         if (!target) throw new Error('找不到该工作区。');
         await selectWorkspace(target, 'active', requestId);
         return;
