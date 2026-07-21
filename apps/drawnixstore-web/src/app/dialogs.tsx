@@ -169,6 +169,7 @@ export function ConfirmDialog({
 }
 
 interface ShareDialogProps {
+  title: string;
   url: string;
   embedUrl: string;
   enabled: boolean;
@@ -176,8 +177,9 @@ interface ShareDialogProps {
   onEnabledChange: (enabled: boolean) => Promise<void>;
 }
 
-/** 管理 Canvas 的公开访问开关，并在开启后提供普通链接与安全嵌入代码。 */
+/** 管理 Canvas 的公开访问开关，并在开启后提供可直接嵌入或跳转的分享片段。 */
 export function ShareDialog({
+  title,
   url,
   embedUrl,
   enabled,
@@ -220,7 +222,22 @@ export function ShareDialog({
     }
   }
 
-  const embedCode = `<img src="${embedUrl}" alt="Canvas preview" />`;
+  const htmlTitle = title.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const markdownTitle = title.replace(/[\\[\]]/g, '\\$&');
+  const snippets = [
+    { label: '图片地址', value: embedUrl },
+    { label: 'HTML 图片', value: `<img src="${embedUrl}" alt="${htmlTitle}" />` },
+    {
+      label: '带链接 HTML 图片',
+      value: `<a href="${url}"><img src="${embedUrl}" alt="${htmlTitle}" /></a>`,
+    },
+    { label: 'Markdown 图片', value: `![${markdownTitle}](${embedUrl})` },
+    {
+      label: '带链接 Markdown 图片',
+      value: `[![${markdownTitle}](${embedUrl})](${url})`,
+    },
+    { label: '分享页面地址', value: url },
+  ];
   return (
     <DialogShell
       description="开启后，持有链接的人可以查看最新一次成功保存的 SVG 预览。"
@@ -241,22 +258,26 @@ export function ShareDialog({
       </label>
       {enabled && (
         <div className="share-links">
-          <label>
-            分享链接
-            <input readOnly value={url} />
-          </label>
-          <button className="button" type="button" onClick={() => void copy(url, '链接')}>
-            <Link2 aria-hidden="true" size={16} />
-            复制链接
-          </button>
-          <label>
-            嵌入代码
-            <textarea readOnly value={embedCode} />
-          </label>
-          <button className="button" type="button" onClick={() => void copy(embedCode, '代码')}>
-            <Copy aria-hidden="true" size={16} />
-            复制嵌入代码
-          </button>
+          {snippets.map((snippet) => (
+            <div className="share-snippet" key={snippet.label}>
+              <label>
+                {snippet.label}
+                <textarea readOnly value={snippet.value} />
+              </label>
+              <button
+                className="icon-button"
+                title={`复制${snippet.label}`}
+                type="button"
+                onClick={() => void copy(snippet.value, snippet.label)}
+              >
+                {snippet.label === '分享页面地址' ? (
+                  <Link2 aria-hidden="true" size={16} />
+                ) : (
+                  <Copy aria-hidden="true" size={16} />
+                )}
+              </button>
+            </div>
+          ))}
           {copied && <p className="share-copied">{copied}</p>}
         </div>
       )}
