@@ -1,5 +1,5 @@
-# 构建 tlStore 的外部产物并发布三个最小运行镜像，部署主机无需持有源码和 Node 工具链。
-name: 发布 tlStore 镜像
+# 构建 Drawnix Store 的外部产物并发布三个最小运行镜像，部署主机无需持有源码和 Node 工具链。
+name: 发布 Drawnix Store 镜像
 
 on:
   push:
@@ -34,8 +34,8 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
-      - name: 构建 tlStore 运行产物
-        run: npm run build:tlstore-images
+      - name: 构建 Drawnix Store 运行产物
+        run: npm run build:drawnix-store-images
 
       - uses: docker/setup-buildx-action@v4
 
@@ -51,7 +51,7 @@ jobs:
         id: web-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}-tlstore-web
+          images: ${{ env.IMAGE_PREFIX }}-web
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -72,7 +72,7 @@ jobs:
         id: api-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}-tlstore-api
+          images: ${{ env.IMAGE_PREFIX }}-api
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -94,7 +94,7 @@ jobs:
         id: bootstrap-meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}-tlstore-bootstrap
+          images: ${{ env.IMAGE_PREFIX }}-bootstrap
           tags: |
             type=ref,event=branch
             type=ref,event=tag

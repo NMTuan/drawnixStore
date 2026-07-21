@@ -30,7 +30,7 @@ services:
       - tlstore-pocketbase-data:/pb_data
   tlstore-bootstrap:
     # 由 GitHub Actions 发布；部署主机不需要拉取源码或本地构建镜像。
-    image: ${TLSTORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-tlstore-bootstrap:${TLSTORE_IMAGE_TAG:-latest}
+    image: ${DRAWNIX_STORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-bootstrap:${DRAWNIX_STORE_IMAGE_TAG:-latest}
     depends_on:
       pocketbase:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
       POCKETBASE_SUPERUSER_EMAIL: ${NITRO_POCKETBASE_SUPERUSER_EMAIL:?请设置 PocketBase 管理员邮箱}
       POCKETBASE_SUPERUSER_PASSWORD: ${NITRO_POCKETBASE_SUPERUSER_PASSWORD:?请设置 PocketBase 管理员密码}
   tlstore-api:
-    image: ${TLSTORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-tlstore-api:${TLSTORE_IMAGE_TAG:-latest}
+    image: ${DRAWNIX_STORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-api:${DRAWNIX_STORE_IMAGE_TAG:-latest}
     depends_on:
       tlstore-bootstrap:
         condition: service_completed_successfully
@@ -54,7 +54,7 @@ services:
       NITRO_SESSION_SECURE: ${NITRO_SESSION_SECURE:-true}
     restart: unless-stopped
   tlstore-web:
-    image: ${TLSTORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-tlstore-web:${TLSTORE_IMAGE_TAG:-latest}
+    image: ${DRAWNIX_STORE_IMAGE_REPOSITORY:-ghcr.io/nmtuan/drawnixstore}-web:${DRAWNIX_STORE_IMAGE_TAG:-latest}
     depends_on:
       tlstore-api:
         condition: service_started
