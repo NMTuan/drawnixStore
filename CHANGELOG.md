@@ -1,3 +1,46 @@
+## 0.4.2 (2026-08-07)
+
+### 🚀 Features
+
+- persist selected tool state ([#416](https://github.com/NMTuan/drawnixStore/pull/416))
+- 新增 tlStore 私有画布工作区 ([86a3460](https://github.com/NMTuan/drawnixStore/commit/86a3460))
+- 增加 Canvas SVG 分享与嵌入服务 ([599e77e](https://github.com/NMTuan/drawnixStore/commit/599e77e))
+- 引入 tlStore BFF 服务层 ([90d80d6](https://github.com/NMTuan/drawnixStore/commit/90d80d6))
+- 合并 tlStore BFF 功能 ([2e2316a](https://github.com/NMTuan/drawnixStore/commit/2e2316a))
+- 精简 tlStore 流水线并修复首次登录 ([094db57](https://github.com/NMTuan/drawnixStore/commit/094db57))
+- 统一 Drawnix Store 业务命名 ([1baf64f](https://github.com/NMTuan/drawnixStore/commit/1baf64f))
+- 增加画布分享代码片段 ([27d3503](https://github.com/NMTuan/drawnixStore/commit/27d3503))
+- 增加私有账户初始化 ([3b7fd2d](https://github.com/NMTuan/drawnixStore/commit/3b7fd2d))
+- **app-menu-items:** split save and save as file actions ([#411](https://github.com/NMTuan/drawnixStore/pull/411))
+- **board:** hide native scrollbars ([#440](https://github.com/NMTuan/drawnixStore/pull/440))
+- **drawnix:** support global toast ([#433](https://github.com/NMTuan/drawnixStore/pull/433))
+- **freehand:** increase freehand stroke width range ([#445](https://github.com/NMTuan/drawnixStore/pull/445))
+- **menu:** add ChevronRightIcon and apply it for menuitem with submenu ([#423](https://github.com/NMTuan/drawnixStore/pull/423))
+- **more-options:** improve more-options ([#415](https://github.com/NMTuan/drawnixStore/pull/415))
+- **popup-toolbar:** modified tool icon size from 20px to 18px for popup toolbar ([#422](https://github.com/NMTuan/drawnixStore/pull/422))
+- **preference:** persist language and copy/export transparency ([#437](https://github.com/NMTuan/drawnixStore/pull/437))
+
+### 🩹 Fixes
+
+- fix break changes after bump @plait/core@0.93.1 ([#408](https://github.com/NMTuan/drawnixStore/pull/408))
+- show more options for image selections ([#455](https://github.com/NMTuan/drawnixStore/pull/455))
+- 修复发布锁文件与镜像命名 ([0bfebcd](https://github.com/NMTuan/drawnixStore/commit/0bfebcd))
+- 根据公开来源设置会话 Cookie ([984c179](https://github.com/NMTuan/drawnixStore/commit/984c179))
+- **drawnix:** refresh freehand selection on viewport changes ([#454](https://github.com/NMTuan/drawnixStore/pull/454))
+- **freehand:** improve white preset contrast in dark theme #397 ([#399](https://github.com/NMTuan/drawnixStore/pull/399), [#397](https://github.com/NMTuan/drawnixStore/issues/397))
+- **pointer:** sync tool pointer after drawing ([#428](https://github.com/NMTuan/drawnixStore/pull/428))
+- **publish:** streamline image tag handling by setting tag without 'v' prefix ([#401](https://github.com/NMTuan/drawnixStore/pull/401))
+- **shapes:** distinguish round rectangle icon ([#412](https://github.com/NMTuan/drawnixStore/pull/412))
+- **toolbar:** sync grouped tool icons ([#427](https://github.com/NMTuan/drawnixStore/pull/427))
+
+### ❤️ Thank You
+
+- Copilot @Copilot
+- Nightt @nightt5879
+- nmtuan
+- pubuzhixing8
+- renyang@lu @lurenyang418
+
 ## 0.4.0 (2026-04-19)
 
 
