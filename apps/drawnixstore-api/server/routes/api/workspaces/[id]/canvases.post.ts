@@ -2,6 +2,7 @@
 import { createError, defineHandler, readBody } from 'h3';
 import { assertTrustedOrigin, requireUser, toApiError } from '../../../../utils/auth';
 import {
+  assertCanvasWriteBodySize,
   canvasDto,
   documentText,
   requiredText,
@@ -16,6 +17,7 @@ interface CreateCanvasBody {
 export default defineHandler(async (event) => {
   assertTrustedOrigin(event);
   const workspaceId = event.context.params?.id || '';
+  await assertCanvasWriteBodySize(event);
   const body = (await readBody<CreateCanvasBody>(event)) || {};
   if (!workspaceId) throw createError({ statusCode: 400, statusMessage: '工作区标识不合法。' });
   try {

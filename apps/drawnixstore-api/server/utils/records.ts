@@ -1,9 +1,13 @@
 /** Drawnix Store BFF 的稳定记录 DTO、输入校验与 PocketBase 映射。 */
-import { createError } from 'h3';
+import {
+  getUtf8ByteLength,
+  MAX_CANVAS_DOCUMENT_BYTES,
+  MAX_CANVAS_WRITE_BYTES,
+} from '@drawnixstore/domain';
+import { assertBodySize, createError, type H3Event } from 'h3';
 import type { RecordModel } from 'pocketbase';
 
 const SHARE_TOKEN_PATTERN = /^[a-f0-9]{48}$/;
-const MAX_DOCUMENT_SIZE = 10_000_000;
 const canvasLocks = new Map<string, Promise<void>>();
 
 /** 返回给浏览器的私有 Workspace 数据。 */
@@ -82,11 +86,39 @@ export function requiredText(value: unknown, label: string, maximum: number): st
   return text;
 }
 
-/** 校验持久化快照或 SVG 的文本大小，限制单条 Canvas 写入的最大负载。 */
+/** 校验持久化快照或 SVG 的 UTF-8 大小，限制单个 Canvas 文档字段的容量。 */
 export function documentText(value: unknown, label: string): string {
-  if (typeof value !== 'string' || value.length > MAX_DOCUMENT_SIZE)
+  if (typeof value !== 'string')
     throw createError({ statusCode: 400, statusMessage: `${label}内容不合法。` });
+  if (getUtf8ByteLength(value) > MAX_CANVAS_DOCUMENT_BYTES)
+    throw createError({
+      statusCode: 413,
+      statusMessage: `${label}超过 10 MiB 上限，请减少图片或画布内容后重试。`,
+    });
   return value;
+}
+
+/** 在读取 JSON 前限制整条 Canvas 写入请求，防止大请求绕过字段校验占用 API 内存。 */
+export async function assertCanvasWriteBodySize(event: H3Event): Promise<void> {
+  try {
+    await assertBodySize(event, MAX_CANVAS_WRITE_BYTES);
+  } catch (error) {
+    if (isRequestEntityTooLarge(error))
+      throw createError({
+        statusCode: 413,
+        statusMessage: '画布保存请求超过 24 MiB 上限，请减少图片或画布内容后重试。',
+      });
+    throw error;
+  }
+}
+
+/** 兼容 H3 不同版本对请求体过大错误使用的 status 或 statusCode 字段。 */
+function isRequestEntityTooLarge(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  return (
+    ('status' in error && error.status === 413) ||
+    ('statusCode' in error && error.statusCode === 413)
+  );
 }
 
 /** 生成 192 位十六进制 bearer token，随机源只在服务端运行。 */

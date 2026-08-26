@@ -1,3 +1,13 @@
+## 0.4.3 (2026-08-26)
+
+### 🩹 Fixes
+
+- 修复大画布自动保存 ([8455f3f](https://github.com/NMTuan/drawnixStore/commit/8455f3f))
+
+### ❤️ Thank You
+
+- nmtuan
+
 ## 0.4.2 (2026-08-07)
 
 ### 🚀 Features

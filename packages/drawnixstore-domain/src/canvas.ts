@@ -3,6 +3,17 @@
  * 该模块不依赖 Drawnix 或 Plait 的运行时类型，使持久化记录可在上游编辑器升级时独立演进。
  */
 
+/** 单个可持久化 Canvas 文档字段允许的最大 UTF-8 字节数。 */
+export const MAX_CANVAS_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+/** 单次 Canvas 写入 JSON（快照、预览及元数据合计）允许的最大 UTF-8 字节数。 */
+export const MAX_CANVAS_WRITE_BYTES = 24 * 1024 * 1024;
+
+/** 按传输时的 UTF-8 字节数衡量文本，避免以 JavaScript 字符数代替实际请求大小。 */
+export function getUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
 /** 保存到 Canvas 记录的 Drawnix 文档状态。 */
 export interface CanvasSnapshot {
   children: unknown[];

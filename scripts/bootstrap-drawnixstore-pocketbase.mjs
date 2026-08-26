@@ -11,6 +11,8 @@ const baseUrl = process.env.POCKETBASE_INTERNAL_URL || process.env.NITRO_POCKETB
 const email = process.env.POCKETBASE_SUPERUSER_EMAIL;
 const password = process.env.POCKETBASE_SUPERUSER_PASSWORD;
 const INITIAL_SETUP_RECORD_ID = 'initialsetup001';
+// 与业务 API 的单文档 UTF-8 容量合同对齐；PocketBase 继续承担字段结构校验。
+const MAX_CANVAS_DOCUMENT_SIZE = 10 * 1024 * 1024;
 
 if (!baseUrl || !email || !password) throw new Error('缺少 PocketBase 初始化所需环境变量。');
 
@@ -138,9 +140,21 @@ async function bootstrap() {
         cascadeDelete: true,
       },
       { name: 'title', type: 'text', required: true, min: 1, max: 200 },
-      { name: 'snapshot', type: 'text', required: false, max: 10_000_000, default: '' },
+      {
+        name: 'snapshot',
+        type: 'text',
+        required: false,
+        max: MAX_CANVAS_DOCUMENT_SIZE,
+        default: '',
+      },
       // SVG 只作为列表和嵌入读模型；源快照始终是 Canvas 的唯一编辑真相。
-      { name: 'preview_svg', type: 'text', required: false, max: 10_000_000, default: '' },
+      {
+        name: 'preview_svg',
+        type: 'text',
+        required: false,
+        max: MAX_CANVAS_DOCUMENT_SIZE,
+        default: '',
+      },
       // 分享 token 是 bearer credential，由 BFF 服务端安全随机源生成，API 只在开关开启时接受它。
       { name: 'share_token', type: 'text', required: false, max: 128, default: '' },
       { name: 'share_enabled', type: 'bool', required: false, default: false },
