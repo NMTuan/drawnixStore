@@ -2,6 +2,7 @@
 import { createError, defineHandler, readBody } from 'h3';
 import { assertTrustedOrigin, requireUser, toApiError } from '../../../utils/auth';
 import {
+  assertCanvasWriteBodySize,
   canvasDto,
   documentText,
   requiredText,
@@ -21,6 +22,7 @@ interface UpdateCanvasBody {
 export default defineHandler(async (event) => {
   assertTrustedOrigin(event);
   const id = event.context.params?.id || '';
+  await assertCanvasWriteBodySize(event);
   const body = (await readBody<UpdateCanvasBody>(event)) || {};
   if (!id) throw createError({ statusCode: 400, statusMessage: '画布标识不合法。' });
   const update: Record<string, string | number | boolean> = {};

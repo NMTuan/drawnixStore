@@ -15,6 +15,8 @@ Web 默认绑定 `0.0.0.0`。生产环境必须由外部 HTTPS 反向代理提�
 
 仅限受控的局域网 HTTP 调试，可将 `DRAWNIX_STORE_PUBLIC_ORIGIN` 设置为完整的 `http://主机地址:端口`。此模式不适用于公网或生产部署。
 
+局域网直接访问 Compose 暴露的 Web 端口时，不存在额外反向代理；请求体边界由 `drawnixstore-web` 容器内的 Nginx 提供。Canvas 写入总预算为 24 MiB，容器 Nginx 配置为 25 MiB。后续若在其前增加 Nginx、Caddy 或其他代理，该代理的请求体上限必须不低于 25 MiB。
+
 会话 Cookie 配置取决于镜像版本：
 
 - `v0.2.0`：`NITRO_SESSION_SECURE` 显式控制 Cookie 是否带 `Secure` 属性。HTTPS 入口必须设为 `true`；HTTP 调试入口必须设为 `false`。若 HTTP 入口错误设为 `true`，浏览器会拒绝 `Secure` Cookie，注册或登录虽会成功，但后续 `/api/workspaces` 会因未携带会话 Cookie 返回 `401`。

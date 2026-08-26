@@ -1,9 +1,14 @@
 /** Drawnix Store SVG API 的 Nitro 配置，所有 PocketBase 凭据仅在服务端运行时读取。 */
+import { resolve } from 'node:path';
 import { defineConfig } from 'nitro';
 
 export default defineConfig({
   rootDir: __dirname,
   serverDir: './server',
+  // API 与浏览器共享 Canvas 容量合同，构建时必须将业务领域包内联而非保留为运行时外部依赖。
+  alias: {
+    '@drawnixstore/domain': resolve(__dirname, '../../packages/drawnixstore-domain/src/index.ts'),
+  },
   // 与 drawnixstore-web 的 Vite 开发代理保持一致；生产环境由 NITRO_PORT 覆盖。
   devServer: { port: 7400 },
   output: { dir: '../../dist/apps/drawnixstore-api' },
