@@ -2,7 +2,13 @@
  * Drawnix Store 根组件管理认证、唯一 URL、工作区导航及 Canvas 生命周期。
  * 编辑器仅通过 Drawnix 的公开 Props 和回调接入，私有数据授权由 PocketBase rule 执行。
  */
-import { createEmptyCanvasSnapshot, serializeCanvasSnapshot } from '@drawnixstore/domain';
+import {
+  createEmptyCanvasSnapshot,
+  getUtf8ByteLength,
+  MAX_CANVAS_DOCUMENT_BYTES,
+  MAX_CANVAS_WRITE_BYTES,
+  serializeCanvasSnapshot,
+} from '@drawnixstore/domain';
 import {
   Archive,
   ArchiveRestore,
@@ -15,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { bff, type AuthEntryStatus } from '../bff-client';
+import { BffRequestError, bff, type AuthEntryStatus } from '../bff-client';
 import { CanvasEditor, type PendingCanvasSave } from './canvas-editor';
 import { CanvasSvg } from './canvas-svg';
 import { ConfirmDialog, ShareDialog, TextDialog } from './dialogs';
@@ -37,6 +43,11 @@ function navigate(path: string) {
 /** 将服务端异常收敛为面向用户的简短提示。 */
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : '请求失败，请稍后重试。';
+}
+
+/** 将浏览器端预检失败转换为带 HTTP 语义的错误，使保存队列不会重试同一超限快照。 */
+function canvasPayloadTooLarge(message: string): BffRequestError {
+  return new BffRequestError(message, 413);
 }
 
 /** 格式化 Canvas 的更新时间，方便用户扫描列表。 */
@@ -294,9 +305,17 @@ export function App() {
   }
 
   /** 成功保存后的服务端记录覆盖本地状态，明确采用最后成功保存优先语义。 */
-  async function saveCanvas(save: PendingCanvasSave) {
+  async function saveCanvas(
+    save: PendingCanvasSave,
+    nextRevision: number,
+    isEditorActive: () => boolean
+  ): Promise<number> {
     if (!canvas) throw new Error('当前画布已关闭，无法保存。');
+    const savingCanvas = canvas;
     try {
+      if (getUtf8ByteLength(save.snapshot) > MAX_CANVAS_DOCUMENT_BYTES)
+        throw canvasPayloadTooLarge('画布快照超过 10 MiB 上限，请减少图片或画布内容后重新保存。');
+
       const update: {
         snapshot: string;
         revision: number;
@@ -304,21 +323,37 @@ export function App() {
         shareEnabled?: boolean;
       } = {
         snapshot: save.snapshot,
-        revision: canvas.revision + 1,
+        revision: nextRevision,
       };
       // 图片会以内嵌 Data URL 进入 SVG；超限时关闭分享，避免旧预览继续公开。
-      if (save.previewSvg && save.previewSvg.length > 10_000_000) {
+      if (save.previewSvg && getUtf8ByteLength(save.previewSvg) > MAX_CANVAS_DOCUMENT_BYTES) {
         update.previewSvg = '';
         update.shareEnabled = false;
-        setError('SVG 预览超过 10 MB，已保存画布快照并关闭分享。');
+        setError('SVG 预览超过 10 MiB，已保存画布快照并关闭分享。');
       } else if (save.previewSvg) {
         update.previewSvg = save.previewSvg;
       }
-      const updated = await bff.updateCanvas(canvas.id, update);
-      setCanvas(updated);
+
+      // 即使两个字段各自合格，JSON 转义后的合并请求仍可能超过 Canvas 写入预算。
+      if (getUtf8ByteLength(JSON.stringify(update)) > MAX_CANVAS_WRITE_BYTES && update.previewSvg) {
+        update.previewSvg = '';
+        update.shareEnabled = false;
+        setError('SVG 预览超出本次写入预算，已保存画布快照并关闭分享。');
+      }
+      if (getUtf8ByteLength(JSON.stringify(update)) > MAX_CANVAS_WRITE_BYTES)
+        throw canvasPayloadTooLarge(
+          '画布保存请求超过 24 MiB 上限，请减少图片或画布内容后重新保存。'
+        );
+
+      const updated = await bff.updateCanvas(savingCanvas.id, update);
+      // 编辑器卸载后在途请求仍可能被服务端完成；不得让旧实例结果覆盖已重新打开的同一画布。
+      if (isEditorActive() && window.location.pathname === `/canvases/${updated.id}`)
+        setCanvas(updated);
       setCanvases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      return updated.revision;
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (isEditorActive() && window.location.pathname === `/canvases/${savingCanvas.id}`)
+        setError(errorMessage(cause));
       throw cause;
     }
   }
@@ -389,6 +424,7 @@ export function App() {
           onBack={() => navigate(`/workspaces/${canvas.workspace}`)}
           onRename={() => setDialog({ kind: 'rename-canvas', canvas })}
           onSave={saveCanvas}
+          onStorageWarning={setError}
           onShare={() => void openShare(canvas)}
         />
         {error && <ErrorBanner message={error} onClose={() => setError('')} />}

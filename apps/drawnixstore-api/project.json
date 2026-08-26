@@ -20,7 +20,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "vitest run apps/drawnixstore-api/server"
+        "command": "vitest run --config apps/drawnixstore-api/vite.config.ts"
       }
     }
   }

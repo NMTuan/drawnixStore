@@ -1,7 +1,7 @@
 /// <reference types="vitest/globals" />
 /** 验证浏览器 BFF 客户端的同源请求与存储 DTO 映射，防止重新引入 PocketBase 直连。 */
 import { afterEach, expect, it, vi } from 'vitest';
-import { bff } from './bff-client';
+import { BffRequestError, BffTransportError, bff, getCanvasSaveRetryDelay } from './bff-client';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -100,4 +100,31 @@ it('通过受登录保护的 BFF 解析分享页编辑入口', async () => {
     credentials: 'same-origin',
     headers: {},
   });
+});
+
+it('将 Nginx 的 HTML 413 转为带状态的确定性保存错误', async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(
+      new Response('<html><h1>413 Request Entity Too Large</h1></html>', { status: 413 })
+    );
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(bff.updateCanvas('canvas-1', { snapshot: '{}' })).rejects.toMatchObject({
+    name: 'BffRequestError',
+    status: 413,
+    message: '请求内容超过允许大小，请减少画布内容或图片后重新保存。',
+  });
+  expect(getCanvasSaveRetryDelay(new BffRequestError('too large', 413), 1)).toBeNull();
+});
+
+it('仅为传输错误、限流和服务端错误计算 Canvas 保存退避', async () => {
+  expect(getCanvasSaveRetryDelay(new BffTransportError('offline', new Error('offline')), 1)).toBe(
+    1_000
+  );
+  expect(getCanvasSaveRetryDelay(new BffRequestError('limited', 429, 5_000), 3)).toBe(5_000);
+  expect(getCanvasSaveRetryDelay(new BffRequestError('server', 503), 3)).toBe(4_000);
+  for (const status of [400, 401, 403, 409, 413]) {
+    expect(getCanvasSaveRetryDelay(new BffRequestError('deterministic', status), 1)).toBeNull();
+  }
 });

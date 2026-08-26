@@ -34,6 +34,32 @@ export interface AuthEntryStatus {
   initialSetupAvailable: boolean;
 }
 
+/** BFF 返回了可识别 HTTP 状态时使用的错误，保存队列据此区分确定性与临时失败。 */
+export class BffRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterMs?: number
+  ) {
+    super(message);
+    this.name = 'BffRequestError';
+  }
+}
+
+/** 请求未能到达 BFF 或未获得响应时使用的传输错误。 */
+export class BffTransportError extends Error {
+  constructor(
+    message: string,
+    readonly cause: unknown
+  ) {
+    super(message);
+    this.name = 'BffTransportError';
+  }
+}
+
+const INITIAL_RETRY_DELAY_MS = 1_000;
+const MAX_RETRY_DELAY_MS = 30_000;
+
 function workspaceRecord(workspace: ApiWorkspace): WorkspaceRecord {
   return {
     id: workspace.id,
@@ -60,18 +86,65 @@ function canvasRecord(canvas: ApiCanvas): CanvasRecord {
   };
 }
 
+/** 将代理返回的状态转换为可读提示；Nginx 的 HTML 错页也能保留其 HTTP 语义。 */
+function requestErrorMessage(
+  status: number,
+  body: { statusMessage?: string; message?: string } | null
+) {
+  if (body?.statusMessage || body?.message) return body.statusMessage || body.message || '';
+  if (status === 413) return '请求内容超过允许大小，请减少画布内容或图片后重新保存。';
+  if (status === 429) return '请求过于频繁，正在稍后重试。';
+  if (status >= 500) return '服务暂时不可用，正在稍后重试。';
+  return '请求失败，请稍后重试。';
+}
+
+/** 解析服务端 Retry-After，并将自动重试等待时间限制在一个可控范围内。 */
+function retryAfterMilliseconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0)
+    return Math.min(Math.max(seconds * 1_000, INITIAL_RETRY_DELAY_MS), MAX_RETRY_DELAY_MS);
+
+  const retryAt = Date.parse(value);
+  if (Number.isNaN(retryAt)) return undefined;
+  return Math.min(Math.max(retryAt - Date.now(), INITIAL_RETRY_DELAY_MS), MAX_RETRY_DELAY_MS);
+}
+
+/** 返回 Canvas 保存失败的自动重试等待时间；null 表示相同请求重试没有意义。 */
+export function getCanvasSaveRetryDelay(error: unknown, attempt: number): number | null {
+  if (error instanceof BffRequestError) {
+    const retryableStatus = error.status === 408 || error.status === 429 || error.status >= 500;
+    if (!retryableStatus) return null;
+    if (error.status === 429 && error.retryAfterMs !== undefined) return error.retryAfterMs;
+  } else if (!(error instanceof BffTransportError)) {
+    return null;
+  }
+
+  const exponentialDelay = INITIAL_RETRY_DELAY_MS * 2 ** Math.max(0, attempt - 1);
+  return Math.min(exponentialDelay, MAX_RETRY_DELAY_MS);
+}
+
 /** 对 BFF 进行同源 JSON 请求，并把服务端安全错误统一转为界面可展示的 Error。 */
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    credentials: 'same-origin',
-    headers: { ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...init,
+      credentials: 'same-origin',
+      headers: { ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
+    });
+  } catch (error) {
+    throw new BffTransportError('网络连接异常，请检查网络后重试。', error);
+  }
   const body = (await response.json().catch(() => null)) as
     | (T & { statusMessage?: string; message?: string })
     | null;
   if (!response.ok)
-    throw new Error(body?.statusMessage || body?.message || '请求失败，请稍后重试。');
+    throw new BffRequestError(
+      requestErrorMessage(response.status, body),
+      response.status,
+      retryAfterMilliseconds(response.headers.get('Retry-After'))
+    );
   return body as T;
 }
 
